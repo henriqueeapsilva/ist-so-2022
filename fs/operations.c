@@ -133,21 +133,33 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 }
 
 int tfs_sym_link(char const *target, char const *link_name) {
-    (void)target;
-    (void)link_name;
-    // ^ this is a trick to keep the compiler from complaining about unused
-    // variables. TODO: remove
+    int fhandle = tfs_open(link_name, TFS_O_CREAT);
 
-    PANIC("TODO: tfs_sym_link");
+    if (!fhandle) {
+        fhandle = tfs_open(link_name, TFS_O_TRUNC);
+
+        if (!fhandle) return -1;
+    }
+
+    ssize_t counter;
+
+    while ((counter = tfs_write(fhandle, target, 256))) {
+        target += counter;
+    }
+
+    return 0;
 }
 
 int tfs_link(char const *target, char const *link_name) {
-    (void)target;
-    (void)link_name;
-    // ^ this is a trick to keep the compiler from complaining about unused
-    // variables. TODO: remove
+    int inumber = tfs_lookup(target, TFS_O_CREAT);
 
-    PANIC("TODO: tfs_link");
+    inode_t *inode = inode_get(inumber);
+
+    if (!inode) return -1;
+
+    inode->i_size++;
+
+    return add_dir_entry(inode, link_name, inumber);
 }
 
 int tfs_close(int fhandle) {
