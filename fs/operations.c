@@ -131,6 +131,20 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
     // opened but it remains created
 }
 
+int open_symbolic(char const *name, tfs_file_mode_t mode){
+    int fhandle = tfs_open(name,mode);
+    char buffer[256];
+    while(tfs_read(fhandle,buffer,256));
+    if(tfs_lookup(buffer, inode_get(ROOT_DIR_INUM)) != -1){
+        if(!tfs_close(fhandle)) return -1;
+        return open_symbolic(buffer, mode);
+    }
+    open_file_entry_t *pointer = get_open_file_entry(fhandle);
+    pointer->of_offset = 0;
+
+    return fhandle;
+}
+
 int tfs_sym_link(char const *target, char const *link_name) {
     int fhandle = tfs_open(link_name, TFS_O_CREAT);
 
