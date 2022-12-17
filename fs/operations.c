@@ -135,7 +135,7 @@ int tfs_open(char const *name, tfs_file_mode_t mode){
      int fhandle;
      ssize_t begin = 0;
      char buffer[256];
-     char file_data[256];
+     char file_data[1024];
      ssize_t readed;
      fhandle = open_symbolic(name, mode);
      do {
@@ -145,7 +145,7 @@ int tfs_open(char const *name, tfs_file_mode_t mode){
          for(; pos < readed; pos++) {
             file_data[pos + begin] = buffer[pos];
          }
-         begin = readed + 1;
+         begin += pos + 1;
     }while(readed > 0);
      if(tfs_lookup(file_data, inode_get(ROOT_DIR_INUM)) != -1){
          if(tfs_close(fhandle) == -1) return -1;
@@ -171,7 +171,7 @@ int tfs_sym_link(char const *target, char const *link_name) {
     do {
         counter = tfs_write(fhandle,target,sizeof(target));
         if(counter == -1) return -1;
-    }while (counter);
+    }while (counter > 0);
 
     if(tfs_close(fhandle) == -1) return -1;
 
