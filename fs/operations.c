@@ -72,7 +72,7 @@ static int tfs_lookup(char const *name, inode_t const *root_inode) {
     return find_in_dir(root_inode, name);
 }
 
-int tfs_open(char const *name, tfs_file_mode_t mode) {
+int open_symbolic(char const *name, tfs_file_mode_t mode) {
     // Checks if the path name is valid
     if (!valid_pathname(name)) {
         return -1;
@@ -131,18 +131,31 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
     // opened but it remains created
 }
 
-int open_symbolic(char const *name, tfs_file_mode_t mode){
-    int fhandle = tfs_open(name,mode);
-    char buffer[256];
-    while(tfs_read(fhandle,buffer,256));
-    if(tfs_lookup(buffer, inode_get(ROOT_DIR_INUM)) != -1){
-        if(!tfs_close(fhandle)) return -1;
-        return open_symbolic(buffer, mode);
-    }
-    open_file_entry_t *pointer = get_open_file_entry(fhandle);
-    pointer->of_offset = 0;
+int tfs_open(char const *name, tfs_file_mode_t mode){
+     int fhandle;
+     ssize_t begin = 0;
+     char buffer[256];
+     char file_data[256];
+     ssize_t readed;
+     fhandle = open_symbolic(name, mode);
+     do {
+         readed = tfs_read(fhandle,buffer,sizeof(buffer));
+         if(readed == -1) return -1;
+         int pos = 0;
+         for(; pos < readed; pos++) {
+            file_data[pos + begin] = buffer[pos];
+         }
+         begin = readed + 1;
+    }while(readed > 0);
+     if(tfs_lookup(file_data, inode_get(ROOT_DIR_INUM)) != -1){
+         if(tfs_close(fhandle) == -1) return -1;
+         fhandle = tfs_open(file_data,mode);
+     }
 
-    return fhandle;
+     open_file_entry_t *pointer = get_open_file_entry(fhandle);
+     pointer->of_offset = 0;
+
+     return fhandle;
 }
 
 int tfs_sym_link(char const *target, char const *link_name) {
@@ -155,24 +168,28 @@ int tfs_sym_link(char const *target, char const *link_name) {
     }
 
     ssize_t counter;
+    do {
+        counter = tfs_write(fhandle,target,sizeof(target));
+        if(counter == -1) return -1;
+    }while (counter);
 
-    while ((counter = tfs_write(fhandle, target, 256))) {
-        target += counter;
-    }
+    if(tfs_close(fhandle) == -1) return -1;
 
     return 0;
 }
 
 int tfs_link(char const *target, char const *link_name) {
-    int inumber = tfs_lookup(target, TFS_O_CREAT);
+    inode_t *root = inode_get(ROOT_DIR_INUM);
+
+    int inumber = tfs_lookup(target, root);
 
     inode_t *inode = inode_get(inumber);
 
     if (!inode) return -1;
 
-    inode->i_size++;
+    inode->i_hardlinks_count++;
 
-    return add_dir_entry(inode, link_name, inumber);
+    return add_dir_entry(root, link_name + 1, inumber);
 }
 
 int tfs_close(int fhandle) {
