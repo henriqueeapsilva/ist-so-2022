@@ -238,7 +238,8 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 }
 
 int tfs_unlink(char const *target) {
-    int inum = tfs_lookup(target, inode_get(ROOT_DIR_INUM));
+    inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
+    int inum = tfs_lookup(target, root_dir_inode);
 
     if (inum == -1) return -1;
 
@@ -246,9 +247,9 @@ int tfs_unlink(char const *target) {
 
     if (!inode) return -1;
 
-    if (clear_dir_entry(inode, target+1) == -1) return -1;
+    if (clear_dir_entry(root_dir_inode, target+1) == -1) return -1;
 
-    if (--inode->i_links == 0) {
+    if ((--inode->i_links) == 0) {
         inode_delete(inum);
     }
 
