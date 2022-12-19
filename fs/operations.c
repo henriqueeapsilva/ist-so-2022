@@ -275,7 +275,7 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     int fhandle = tfs_open(dest_path, TFS_O_TRUNC | TFS_O_CREAT);
     if (fhandle == -1) return -1;
 
-    if (tfs_write(fhandle, buffer, result) < 0) {
+    if (tfs_write(fhandle, buffer, result) == -1) {
         tfs_close(fhandle);
         return -1;
     }

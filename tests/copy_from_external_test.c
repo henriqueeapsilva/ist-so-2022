@@ -10,7 +10,7 @@ int main() {
     char *path_copied_file = "/f1";
     char *path_src = "tests/file_to_copy_over_test.txt";
     char *path_error = "tests/unknown_file.txt";
-    char buffer[600];
+    char buffer[200];
 
     assert(tfs_init(NULL) != -1);
 
