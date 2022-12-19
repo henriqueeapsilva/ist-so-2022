@@ -91,7 +91,7 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 
     if (inode->i_node_type == T_LINK) {
         char *block = data_block_get(inode->i_data_block);
-        
+        if(tfs_lookup(block,root_dir_inode) == -1) return -1;
         return tfs_open(block, mode);
     }
 
