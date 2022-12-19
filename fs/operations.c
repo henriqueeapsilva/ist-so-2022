@@ -128,7 +128,7 @@ int tfs_sym_link(char const *target, char const *link_name) {
 
     if (!inode) return -1;
 
-    if (inode->i_size == 0) {
+    if (inode->i_data_block == -1) {
         inode->i_data_block = data_block_alloc();
 
         if (inode->i_data_block == -1) return -1;
