@@ -138,14 +138,13 @@ int tfs_sym_link(char const *target, char const *link_name) {
     }
 
     char *block = data_block_get(inode->i_data_block);
-
     strcpy(block, target);
 
     return 0;
 }
 
 int tfs_link(char const *target, char const *link_name) {
-    inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
+    inode_t *root_dir_inode = ROOT_DIR;
     if (!root_dir_inode) return -1;
 
     int inum = tfs_lookup(target, root_dir_inode);
@@ -157,8 +156,6 @@ int tfs_link(char const *target, char const *link_name) {
     if (inode->i_node_type == T_LINK) return -1;
 
     if (add_dir_entry(root_dir_inode, link_name + 1, inum) == -1) return -1;
-
-    inode->i_links++;
     return 0;
 }
 

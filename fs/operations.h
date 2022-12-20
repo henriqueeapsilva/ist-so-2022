@@ -4,6 +4,8 @@
 #include "config.h"
 #include <sys/types.h>
 
+#define ROOT_DIR (inode_get(ROOT_DIR_INUM))
+
 /**
  * TécnicoFS parameters.
  */

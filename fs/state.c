@@ -237,7 +237,7 @@ int inode_create(inode_type i_type) {
         // In case of a new file, simply sets its size to 0
         inode_table[inumber].i_size = 0;
         inode_table[inumber].i_data_block = -1;
-        inode_table[inumber].i_links = 1;
+        inode_table[inumber].i_links = 0;
         break;
     default:
         PANIC("inode_create: unknown file type");
@@ -336,18 +336,18 @@ int clear_dir_entry(inode_t *inode, char const *sub_name) {
  *   - sub_name is not a valid file name (length 0 or > MAX_FILE_NAME - 1).
  *   - Directory is already full of entries.
  */
-int add_dir_entry(inode_t *inode, char const *sub_name, int sub_inumber) {
+int add_dir_entry(inode_t *root_inode, char const *sub_name, int sub_inumber) {
     if (strlen(sub_name) == 0 || strlen(sub_name) > MAX_FILE_NAME - 1) {
         return -1; // invalid sub_name
     }
 
     insert_delay(); // simulate storage access delay to inode with inumber
-    if (inode->i_node_type != T_DIRECTORY) {
+    if (root_inode->i_node_type != T_DIRECTORY) {
         return -1; // not a directory
     }
 
     // Locates the block containing the entries of the directory
-    dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_data_block);
+    dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(root_inode->i_data_block);
     ALWAYS_ASSERT(dir_entry != NULL,
                   "add_dir_entry: directory must have a data block");
 
@@ -357,6 +357,12 @@ int add_dir_entry(inode_t *inode, char const *sub_name, int sub_inumber) {
             dir_entry[i].d_inumber = sub_inumber;
             strncpy(dir_entry[i].d_name, sub_name, MAX_FILE_NAME - 1);
             dir_entry[i].d_name[MAX_FILE_NAME - 1] = '\0';
+
+            inode_t *inode = inode_get(sub_inumber);
+
+            if (inode) {
+                inode->i_links++;
+            }
 
             return 0;
         }
