@@ -66,15 +66,4 @@ void remove_from_open_file_table(int fhandle);
 open_file_entry_t *get_open_file_entry(int fhandle);
 int is_file_open(int inumber);
 
-void rwl_wrlock(int inumber);
-void rwl_rdlock(int inumber);
-void rwl_unlock(int inumber);
-void rwl_init(int inumber);
-void rwl_destroy(int inumber);
-
-void mutex_lock(pthread_mutex_t *mutex);
-void mutex_unlock(pthread_mutex_t *mutex);
-void mutex_init(pthread_mutex_t *mutex);
-void mutex_destroy(pthread_mutex_t *mutex);
-
 #endif // STATE_H
