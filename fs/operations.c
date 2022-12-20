@@ -115,23 +115,26 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 }
 
 int tfs_sym_link(char const *target, char const *link_name) {
-    int inum = inode_create(T_LINK);
+    int inum = tfs_lookup(link_name, ROOT_DIR);
+    if (inum != -1) return -1; // there is a file with the same name already
 
+    if (!strcmp(target, link_name)) return -1; // cannot symlink a file to itself
+
+    inum = inode_create(T_LINK);
     if (inum == -1) return -1;
 
-    if (add_dir_entry(inode_get(ROOT_DIR_INUM), link_name + 1, inum) == -1) {
-        inode_delete(inum);
-        return -1;
-    }
-
     inode_t *inode = inode_get(inum);
-
     if (!inode) return -1;
 
     if (inode->i_data_block == -1) {
         inode->i_data_block = data_block_alloc();
 
         if (inode->i_data_block == -1) return -1;
+    }
+
+    if (add_dir_entry(ROOT_DIR, link_name+1, inum) == -1) {
+        inode_delete(inum);
+        return -1;
     }
 
     char *block = data_block_get(inode->i_data_block);
@@ -260,12 +263,11 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     FILE *file = fopen(source_path, "r");
     if (!file) return -1;
 
-    size_t chars = state_block_size();
-    char buffer[chars];
+    size_t block_size = state_block_size();
+    char buffer[block_size];
 
-    size_t result = fread(buffer, 1, chars, file);
-        
-    if (result == -1) {
+    size_t to_write = fread(buffer, 1, block_size, file);
+    if (to_write == -1) {
         fclose(file);
         return -1;
     }
@@ -275,7 +277,7 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     int fhandle = tfs_open(dest_path, TFS_O_TRUNC | TFS_O_CREAT);
     if (fhandle == -1) return -1;
 
-    if (tfs_write(fhandle, buffer, result) == -1) {
+    if (tfs_write(fhandle, buffer, to_write) == -1) {
         tfs_close(fhandle);
         return -1;
     }

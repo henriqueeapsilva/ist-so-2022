@@ -262,6 +262,9 @@ void inode_delete(int inumber) {
     ALWAYS_ASSERT(freeinode_ts[inumber] == TAKEN,
                   "inode_delete: inode already freed");
 
+    // do not delete the inode if the file is open
+    if (is_file_open(inumber)) return;
+
     if (inode_table[inumber].i_size > 0) {
         data_block_free(inode_table[inumber].i_data_block);
     }
@@ -495,6 +498,13 @@ void remove_from_open_file_table(int fhandle) {
     ALWAYS_ASSERT(free_open_file_entries[fhandle] == TAKEN,
                   "remove_from_open_file_table: file handle must be taken");
 
+    // delete the inode if the file does not exist anymore
+    open_file_entry_t *entry = &open_file_table[fhandle];
+    inode_t *inode = &inode_table[entry->of_inumber];
+    if (inode->i_links == 0) {
+        inode_delete(entry->of_inumber);
+    }
+
     free_open_file_entries[fhandle] = FREE;
 }
 
@@ -508,13 +518,19 @@ void remove_from_open_file_table(int fhandle) {
  * opened.
  */
 open_file_entry_t *get_open_file_entry(int fhandle) {
-    if (!valid_file_handle(fhandle)) {
-        return NULL;
-    }
+    if (!valid_file_handle(fhandle)) return NULL;
 
-    if (free_open_file_entries[fhandle] != TAKEN) {
-        return NULL;
-    }
+    if (free_open_file_entries[fhandle] != TAKEN) return NULL;
 
     return &open_file_table[fhandle];
+}
+
+int is_file_open(int inumber) {
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (free_open_file_entries[i] == FREE) continue;
+        
+        if (open_file_table[i].of_inumber == inumber) return 1;
+    }
+
+    return 0;
 }
