@@ -18,6 +18,7 @@ static tfs_params fs_params;
 // Inode table
 static inode_t *inode_table;
 static allocation_state_t *freeinode_ts;
+static pthread_rwlock_t *inode_rwlocks;
 
 // Data blocks
 static char *fs_data; // # blocks * block size
@@ -102,6 +103,7 @@ int state_init(tfs_params params) {
 
     inode_table = malloc(INODE_TABLE_SIZE * sizeof(inode_t));
     freeinode_ts = malloc(INODE_TABLE_SIZE * sizeof(allocation_state_t));
+    inode_rwlocks = malloc(INODE_TABLE_SIZE * sizeof(pthread_rwlock_t));
     fs_data = malloc(DATA_BLOCKS * BLOCK_SIZE);
     free_blocks = malloc(DATA_BLOCKS * sizeof(allocation_state_t));
     open_file_table = malloc(MAX_OPEN_FILES * sizeof(open_file_entry_t));
@@ -134,12 +136,17 @@ int state_init(tfs_params params) {
  * Returns 0 if succesful, -1 otherwise.
  */
 int state_destroy(void) {
+    for (int i = 0; i < INODE_TABLE_SIZE; i++) {
+        rwl_destroy(i);
+    }
+
     free(inode_table);
     free(freeinode_ts);
     free(fs_data);
     free(free_blocks);
     free(open_file_table);
     free(free_open_file_entries);
+    free(inode_rwlocks);
 
     inode_table = NULL;
     freeinode_ts = NULL;
@@ -147,6 +154,7 @@ int state_destroy(void) {
     free_blocks = NULL;
     open_file_table = NULL;
     free_open_file_entries = NULL;
+    inode_rwlocks = NULL;
 
     return 0;
 }
@@ -236,12 +244,14 @@ int inode_create(inode_type i_type) {
     case T_LINK:
         // In case of a new file, simply sets its size to 0
         inode_table[inumber].i_size = 0;
-        inode_table[inumber].i_data_block = -1;
         inode_table[inumber].i_links = 0;
+        inode_table[inumber].i_data_block = -1;
         break;
     default:
         PANIC("inode_create: unknown file type");
     }
+
+    rwl_init(inumber);
 
     return inumber;
 }
@@ -261,9 +271,6 @@ void inode_delete(int inumber) {
 
     ALWAYS_ASSERT(freeinode_ts[inumber] == TAKEN,
                   "inode_delete: inode already freed");
-
-    // do not delete the inode if the file is open
-    if (is_file_open(inumber)) return;
 
     if (inode_table[inumber].i_size > 0) {
         data_block_free(inode_table[inumber].i_data_block);
@@ -300,14 +307,14 @@ inode_t *inode_get(int inumber) {
  *   - inode is not a directory inode.
  *   - Directory does not contain an entry for sub_name.
  */
-int clear_dir_entry(inode_t *inode, char const *sub_name) {
+int clear_dir_entry(inode_t *root_inode, char const *sub_name) {
     insert_delay();
-    if (inode->i_node_type != T_DIRECTORY) {
+    if (root_inode->i_node_type != T_DIRECTORY) {
         return -1; // not a directory
     }
 
     // Locates the block containing the entries of the directory
-    dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_data_block);
+    dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(root_inode->i_data_block);
     ALWAYS_ASSERT(dir_entry != NULL,
                   "clear_dir_entry: directory must have a data block");
 
@@ -315,6 +322,7 @@ int clear_dir_entry(inode_t *inode, char const *sub_name) {
         if (!strcmp(dir_entry[i].d_name, sub_name)) {
             dir_entry[i].d_inumber = -1;
             memset(dir_entry[i].d_name, 0, MAX_FILE_NAME);
+
             return 0;
         }
     }
@@ -357,13 +365,6 @@ int add_dir_entry(inode_t *root_inode, char const *sub_name, int sub_inumber) {
             dir_entry[i].d_inumber = sub_inumber;
             strncpy(dir_entry[i].d_name, sub_name, MAX_FILE_NAME - 1);
             dir_entry[i].d_name[MAX_FILE_NAME - 1] = '\0';
-
-            inode_t *inode = inode_get(sub_inumber);
-
-            if (inode) {
-                inode->i_links++;
-            }
-
             return 0;
         }
     }
@@ -483,7 +484,6 @@ int add_to_open_file_table(int inumber, size_t offset) {
             free_open_file_entries[i] = TAKEN;
             open_file_table[i].of_inumber = inumber;
             open_file_table[i].of_offset = offset;
-
             return i;
         }
     }
@@ -503,13 +503,6 @@ void remove_from_open_file_table(int fhandle) {
 
     ALWAYS_ASSERT(free_open_file_entries[fhandle] == TAKEN,
                   "remove_from_open_file_table: file handle must be taken");
-
-    // delete the inode if the file does not exist anymore
-    open_file_entry_t *entry = &open_file_table[fhandle];
-    inode_t *inode = &inode_table[entry->of_inumber];
-    if (inode->i_links == 0) {
-        inode_delete(entry->of_inumber);
-    }
 
     free_open_file_entries[fhandle] = FREE;
 }
@@ -539,4 +532,103 @@ int is_file_open(int inumber) {
     }
 
     return 0;
+}
+
+/*
+ * Locks the rwlock to write-read.
+ * Exits with failure if unsuccessful.
+ */
+void rwl_wrlock(int inumber) {
+    if (pthread_rwlock_wrlock(&inode_rwlocks[inumber]) != 0) {
+        perror("Failed to lock RWlock");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Locks the rwlock to read-only.
+ * Exits with failure if unsuccessful.
+ */
+void rwl_rdlock(int inumber) {
+    if (pthread_rwlock_rdlock(&inode_rwlocks[inumber]) != 0) {
+        perror("Failed to lock RWlock");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Unlocks the rwlock.
+ * Exits with failure if unsuccessful.
+ */
+void rwl_unlock(int inumber) {
+    if (pthread_rwlock_unlock(&inode_rwlocks[inumber]) != 0) {
+        perror("Failed to unlock RWlock");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Initializes the rwlock.
+ * Exits with failure if unsuccessful.
+ */
+void rwl_init(int inumber) {
+    if (pthread_rwlock_init(&inode_rwlocks[inumber], NULL) != 0) {
+        perror("Failed to init RWlock");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Destroys the rwlock.
+ * Exits with failure if unsuccessful.
+ */
+void rwl_destroy(int inumber) {
+    if (pthread_rwlock_destroy(&inode_rwlocks[inumber]) != 0) {
+        perror("Failed to destroy RWlock");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Locks the mutex.
+ * Exits with failure if unsuccessful.
+ */
+void mutex_lock(pthread_mutex_t *mutex) {
+    if (pthread_mutex_lock(mutex) != 0) {
+        perror("Failed to lock Mutex");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Unlocks the mutex.
+ * Exits with failure if unsuccessful.
+ */
+void mutex_unlock(pthread_mutex_t *mutex) {
+    if (pthread_mutex_unlock(mutex) != 0) {
+        perror("Failed to unlock Mutex");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Initializes the mutex.
+ * Exits with failure if unsuccessful.
+ */
+void mutex_init(pthread_mutex_t *mutex) {
+    if (pthread_mutex_init(mutex, NULL) != 0) {
+        perror("Failed to init Mutex");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*
+ * Destroys the mutex.
+ * Exits with failure if unsuccessful.
+ */
+void mutex_destroy(pthread_mutex_t *mutex) {
+    if (pthread_mutex_destroy(mutex) != 0) {
+        perror("Failed to destroy Mutex");
+        exit(EXIT_FAILURE);
+    }
 }

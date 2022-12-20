@@ -7,7 +7,7 @@
 
 uint8_t const file_contents[] = "AAA!";
 char const target_path1[] = "/f1";
-char const link_path1[] = "/l1";
+char const link_path[] = "/l1";
 char const target_path2[] = "/f2";
 char const link_path2[] = "/l2";
 
@@ -54,10 +54,10 @@ int main() {
         assert_empty_file(target_path1); // sanity check
     }
 
-    assert(tfs_sym_link(target_path1, link_path1) != -1);
-    assert_empty_file(link_path1);
+    assert(tfs_sym_link(target_path1, link_path) != -1);
+    assert_empty_file(link_path);
 
-    write_contents(link_path1);
+    write_contents(link_path);
     assert_contents_ok(target_path1);
 
     // Write to original file and read through symlink

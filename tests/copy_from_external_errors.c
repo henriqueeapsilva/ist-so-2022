@@ -17,7 +17,8 @@ int main() {
     // Scenario 1: source file does not exist
     assert(tfs_copy_from_external_fs("./unexistent", path1) == -1);
 
-    // TODO: add more failure scenarios
+    // Scenario 2: dest file is not an absolute name
+    assert(tfs_copy_from_external_fs("tests/file_empty.txt", path1+1) == -1);
 
     printf("Successful test.\n");
 
