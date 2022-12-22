@@ -7,8 +7,8 @@
 
 uint8_t const file_contents[] = "AAA!";
 char const target_path1[] = "/f1";
-char const link_path[] = "/l1";
 char const target_path2[] = "/f2";
+char const link_path1[] = "/l1";
 char const link_path2[] = "/l2";
 
 void assert_contents_ok(char const *path) {
@@ -45,7 +45,6 @@ void write_contents(char const *path) {
 int main() {
     assert(tfs_init(NULL) != -1);
 
-    // Write to symlink and read original file
     {
         int f = tfs_open(target_path1, TFS_O_CREAT);
         assert(f != -1);
@@ -54,13 +53,6 @@ int main() {
         assert_empty_file(target_path1); // sanity check
     }
 
-    assert(tfs_link(target_path1, link_path) != -1);
-    assert_empty_file(link_path);
-
-    write_contents(link_path);
-    assert_contents_ok(target_path1);
-
-    // Write to original file and read through symlink
     {
         int f = tfs_open(target_path2, TFS_O_CREAT);
         assert(f != -1);
@@ -70,8 +62,28 @@ int main() {
 
         assert_contents_ok(target_path2); // sanity check
     }
+    
+    /*
+    It should not be possible to symlink a file that already exists due to
+    incompatibilities between files and symbolic links.
 
-    assert(tfs_link(target_path2, link_path2) != -1);
+    Incompatibilities:
+    - The inode type of a symbolic link is T_LINK.
+    - A symbolic link cannot have more than one hard link.
+    */
+    assert(tfs_sym_link(target_path1, target_path2) == -1);
+
+    /*
+    Symlinking a file to itself would lead to never ending loops.
+    */
+    assert(tfs_sym_link(link_path1, link_path1) == -1);
+
+    /*
+    Tries to symlink a file to another symlink, and read its content
+    */
+    assert(tfs_sym_link(target_path2, link_path1) != -1);
+    assert(tfs_sym_link(link_path1, link_path2) != -1);
+    assert_contents_ok(link_path1);
     assert_contents_ok(link_path2);
 
     assert(tfs_destroy() != -1);

@@ -10,7 +10,7 @@ char const target_path1[] = "/f1";
 char const target_path2[] = "/f2";
 char const target_path3[] = "/f3";
 char const target_path4[] = "/f4";
-char const link_path1[] = "/l1";
+char const link_path[] = "/l1";
 
 void assert_contents_ok(char const *path) {
     int f = tfs_open(path, 0);
@@ -51,7 +51,7 @@ int main() {
     }
 
     // create hard link
-    assert(tfs_link(target_path1, link_path1) != -1);
+    assert(tfs_link(target_path1, link_path) != -1);
 
     // create file with content
     {
@@ -77,7 +77,7 @@ int main() {
     }
 
     // unlink file
-    assert(tfs_unlink(link_path1) != -1);
+    assert(tfs_unlink(link_path) != -1);
 
     // create file with content
     {

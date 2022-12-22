@@ -6,7 +6,7 @@
 #include <string.h>
 
 char const target_path1[] = "/f1";
-char const link_path1[] = "/l1";
+char const link_path[] = "/l1";
 char const link_path2[] = "/l2";
 
 int main() {
@@ -21,9 +21,9 @@ int main() {
     }
 
     // create soft link on a file
-    assert(tfs_sym_link(target_path1, link_path1) != -1);
+    assert(tfs_sym_link(target_path1, link_path) != -1);
     // try to create hard link on a soft link
-    assert(tfs_link(link_path1, link_path2) == -1);
+    assert(tfs_link(link_path, link_path2) == -1);
 
     // destroy TécnicoFS
     assert(tfs_destroy() != -1);

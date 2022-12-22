@@ -6,8 +6,8 @@
 int main() {
 
     char *str_ext_file = "";
-    char *path_copied_file = "/f1";
-    char *path_src = "tests/empty_file.txt";
+    char *tfs_path = "/f1";
+    char *ext_path = "tests/file_empty.txt";
     char buffer[40];
 
     assert(tfs_init(NULL) != -1);
@@ -15,10 +15,10 @@ int main() {
     int f;
     ssize_t r;
 
-    f = tfs_copy_from_external_fs(path_src, path_copied_file);
+    f = tfs_copy_from_external_fs(ext_path, tfs_path);
     assert(f != -1);
 
-    f = tfs_open(path_copied_file, TFS_O_CREAT);
+    f = tfs_open(tfs_path, TFS_O_CREAT);
     assert(f != -1);
 
     r = tfs_read(f, buffer, sizeof(buffer) - 1);
