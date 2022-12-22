@@ -10,10 +10,10 @@
 
 tfs_params tfs_default_params() {
     tfs_params params = {
-            .max_inode_count = 64,
-            .max_block_count = 1024,
-            .max_open_files_count = 16,
-            .block_size = 1024,
+        .max_inode_count = 64,
+        .max_block_count = 1024,
+        .max_open_files_count = 16,
+        .block_size = 1024,
     };
     return params;
 }
@@ -62,7 +62,8 @@ static bool valid_pathname(char const *name) {
  * Returns the inumber of the file, -1 if unsuccessful.
  */
 static int tfs_lookup(char const *name, inode_t const *root_inode) {
-    if ((root_inode != inode_get(ROOT_DIR_INUM)) && !valid_pathname(name)) {
+    // TODO: assert that root_inode is the root directory
+    if (!valid_pathname(name)) {
         return -1;
     }
 
@@ -72,7 +73,7 @@ static int tfs_lookup(char const *name, inode_t const *root_inode) {
     return find_in_dir(root_inode, name);
 }
 
-int open_symbolic(char const *name, tfs_file_mode_t mode) {
+int tfs_open(char const *name, tfs_file_mode_t mode) {
     // Checks if the path name is valid
     if (!valid_pathname(name)) {
         return -1;
@@ -131,65 +132,22 @@ int open_symbolic(char const *name, tfs_file_mode_t mode) {
     // opened but it remains created
 }
 
-int tfs_open(char const *name, tfs_file_mode_t mode){
-     int fhandle;
-     ssize_t begin = 0;
-     char buffer[256];
-     char file_data[1024];
-     ssize_t readed;
-     fhandle = open_symbolic(name, mode);
-     do {
-         readed = tfs_read(fhandle,buffer,sizeof(buffer));
-         if(readed == -1) return -1;
-         int pos = 0;
-         for(; pos < readed; pos++) {
-            file_data[pos + begin] = buffer[pos];
-         }
-         begin += pos + 1;
-    }while(readed > 0);
-     if(tfs_lookup(file_data, inode_get(ROOT_DIR_INUM)) != -1){
-         if(tfs_close(fhandle) == -1) return -1;
-         fhandle = tfs_open(file_data,mode);
-     }
-
-     open_file_entry_t *pointer = get_open_file_entry(fhandle);
-     pointer->of_offset = 0;
-
-     return fhandle;
-}
-
 int tfs_sym_link(char const *target, char const *link_name) {
-    int fhandle = tfs_open(link_name, TFS_O_CREAT);
+    (void)target;
+    (void)link_name;
+    // ^ this is a trick to keep the compiler from complaining about unused
+    // variables. TODO: remove
 
-    if (!fhandle) {
-        fhandle = tfs_open(link_name, TFS_O_TRUNC);
-
-        if (!fhandle) return -1;
-    }
-
-    ssize_t counter;
-    do {
-        counter = tfs_write(fhandle,target,sizeof(target));
-        if(counter == -1) return -1;
-    }while (counter > 0);
-
-    if(tfs_close(fhandle) == -1) return -1;
-
-    return 0;
+    PANIC("TODO: tfs_sym_link");
 }
 
 int tfs_link(char const *target, char const *link_name) {
-    inode_t *root = inode_get(ROOT_DIR_INUM);
+    (void)target;
+    (void)link_name;
+    // ^ this is a trick to keep the compiler from complaining about unused
+    // variables. TODO: remove
 
-    int inumber = tfs_lookup(target, root);
-
-    inode_t *inode = inode_get(inumber);
-
-    if (!inode) return -1;
-
-    inode->i_hardlinks_count++;
-
-    return add_dir_entry(root, link_name + 1, inumber);
+    PANIC("TODO: tfs_link");
 }
 
 int tfs_close(int fhandle) {
@@ -284,27 +242,10 @@ int tfs_unlink(char const *target) {
 }
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
-    FILE *file = fopen(source_path, "r");
+    (void)source_path;
+    (void)dest_path;
+    // ^ this is a trick to keep the compiler from complaining about unused
+    // variables. TODO: remove
 
-    if (!file) return -1;
-
-    int fhandle = tfs_open(dest_path, TFS_O_TRUNC);
-
-    if (fhandle == -1) {
-        fhandle = tfs_open(dest_path, TFS_O_CREAT);
-
-        if (fhandle == -1) return -1;
-    }
-
-    char buffer[256];
-    size_t toWrite;
-
-    while ((toWrite = fread(buffer, 1, 256, file))) {
-        tfs_write(fhandle, buffer, toWrite);
-    }
-
-    if (fclose(file) == EOF) return -1;
-    if (tfs_close(fhandle) == -1) return -1;
-
-    return 0;
+    PANIC("TODO: tfs_copy_from_external_fs");
 }
