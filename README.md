@@ -1,5 +1,4 @@
-# projeto-so-2022-23
+# Projeto de Sistemas Operativos 2022-2023
 
-Código fornecido para o projeto de Sistemas Operativos do ano letivo 2022-2023.
-
-Consultar o [enunciado do projeto](https://github.com/tecnico-so/enunciado-proj-so-2022-23).
+Implementação completa da solução ao exercício 1 do projeto proposto pela cadeira de Sistemas Operativos
+do Instituto Superior Técnico.
