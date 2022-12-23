@@ -115,6 +115,16 @@ int tfs_close(int fhandle) {
   }
 
   remove_from_open_file_table(fhandle);
+
+  inode_t *inode = inode_get(file->of_inumber);
+  if (!inode || (inode->i_links > 0)) {
+    return 0;
+  }
+
+  if (!find_open_file_entry(file->of_inumber)) {
+    inode_delete(file->of_inumber);
+  }
+
   return 0;
 }
 
@@ -255,10 +265,14 @@ int tfs_unlink(char const *target) {
     return -1;
   }
 
-  if (--inode->i_links == 0) {
+  if (--inode->i_links > 0) {
+    return 0;
+  }
+  
+  if (!find_open_file_entry(inum)) {
     inode_delete(inum);
   }
-
+  
   return 0;
 }
 

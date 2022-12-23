@@ -70,6 +70,8 @@ int main() {
         w = tfs_write(f1, file_contents, sizeof(file_contents)); // we can still write content though
         assert(w == sizeof(file_contents));
 
+        assert(tfs_open(target_path, TFS_O_CREAT) != -1); // create a file with same name
+
         r = tfs_read(f2, buffer, sizeof(buffer)); // assert content was written
         assert(r == sizeof(buffer));
         assert(memcmp(buffer, file_contents, sizeof(buffer)) == 0);

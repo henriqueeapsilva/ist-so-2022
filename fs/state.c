@@ -521,3 +521,17 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
 
   return &open_file_table[fhandle];
 }
+
+open_file_entry_t *find_open_file_entry(int inumber) {
+  for (int i = 0; i < MAX_OPEN_FILES; i++) {
+    if (free_open_file_entries[i] == FREE) {
+      continue;
+    }
+    
+    if (open_file_table[i].of_inumber == inumber) {
+      return &open_file_table[i];
+    }
+  }
+
+  return NULL;
+}
