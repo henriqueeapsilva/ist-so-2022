@@ -192,10 +192,6 @@ int tfs_sym_link(char const *target, char const *link_name) {
     return -1;
   }
 
-  if (strlen(target) > state_block_size()) {
-    return -1;
-  }
-
   int inum = tfs_create(link_name, T_LINK);
   if (inum == -1) {
     return -1;
@@ -263,41 +259,22 @@ int tfs_unlink(char const *target) {
 }
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
-  int bnum = data_block_alloc();
-  if (bnum == -1) {
-    return -1;
-  }
-
-  char *block = data_block_get(bnum);
-  if (!block) {
-    return -1;
-  }
-
+  char buffer[state_block_size()];
+  
   FILE *file = fopen(source_path, "r");
   if (!file) {
-    data_block_free(bnum);
     return -1;
   }
 
-  size_t size = fread(block, sizeof(char), state_block_size(), file);
-  if (size == -1) {
-    data_block_free(bnum);
+  size_t to_write = fread(buffer, 1, state_block_size(), file);
+  if (to_write == EOF) {
     return -1;
   }
 
-  int inum = tfs_create(dest_path, T_FILE);
-  if (inum == EOF) {
-    data_block_free(bnum);
+  int fhandle = tfs_open(dest_path, TFS_O_CREAT | TFS_O_TRUNC);
+  if (fhandle == -1) {
     return -1;
   }
 
-  inode_t *inode = inode_get(inum);
-  if (!inode) {
-    data_block_free(bnum);
-    return -1;
-  }
-
-  inode->i_bnumber = bnum;
-  inode->i_size = size;
-  return 0;
+  return (tfs_write(fhandle, buffer, to_write) >= 0) - 1;
 }
