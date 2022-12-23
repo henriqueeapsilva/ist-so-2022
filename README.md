@@ -1,9 +1,10 @@
 # Projeto de Sistemas Operativos 2022-2023
 
-Este projeto foi realizado no âmbito da cadeira de Sistemas Operativos do Instituto Superior Técnico
-diriga pelo professor responsável José Manual da Costa Alves Marques.
+Este repositório alberga o projeto de SO realizado pelos alunos Fábio Neto (104126) e Henrique Silva
+(103606) no âmbito da cadeira de Sistemas Operativos do Instituto Superior Técnico dirigda pelo
+professor responsável José Manuel da Costa Alves Marques.
 
-Este repositório foi dividido em branches para facilitar a busca pela informação:
+O repositório encontra-se dividido em branches de modo a facilitar a busca pela informação:
 
 Exercício 1:
 [enunciado](https://github.com/hSilva10/SO-project/blob/statement/exercise1.md) -
