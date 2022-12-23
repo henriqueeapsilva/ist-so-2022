@@ -242,7 +242,7 @@ int tfs_link(char const *target, char const *link_name) {
 
 int tfs_unlink(char const *target) {
   int inum = find_in_dir(ROOT_DIR_INODE, target+1);
-  if (inum == 0) {
+  if (inum < 0) {
     return -1;
   }
 
