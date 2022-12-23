@@ -66,4 +66,17 @@ open_file_entry_t *get_open_file_entry(int fhandle);
 
 open_file_entry_t *find_open_file_entry(int inumber); // new
 
+void wrlock_inode_table();
+void rdlock_inode_table();
+void unlock_inode_table();
+void wrlock_block_table();
+void rdlock_block_table();
+void unlock_block_table();
+void wrlock_open_file_table();
+void rdlock_open_file_table();
+void unlock_open_file_table();
+void wrlock_block(int bnum);
+void rdlock_block(int bnum);
+void unlock_block(int bnum);
+
 #endif // STATE_H

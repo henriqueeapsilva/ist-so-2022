@@ -1,20 +1,24 @@
-#ifndef LOCK_H
-#define LOCK_H
+#ifndef _LOCK_H_
+#define _LOCK_H_
 
 #include <pthread.h>
 
 typedef pthread_mutex_t mutex_t;
 typedef pthread_rwlock_t rwlock_t;
 
+mutex_t *mutex_alloc();
 void mutex_init(mutex_t *mutex);
 void mutex_lock(mutex_t *mutex);
 void mutex_unlock(mutex_t *mutex);
 void mutex_destroy(mutex_t *mutex);
+void mutex_free(mutex_t *mutex);
 
+rwlock_t *rwlock_alloc();
 void rwlock_init(rwlock_t *rwlock);
 void rwlock_rdlock(rwlock_t *rwlock);
 void rwlock_wrlock(rwlock_t *rwlock);
 void rwlock_unlock(rwlock_t *rwlock);
 void rwlock_destroy(rwlock_t *rwlock);
+void rwlock_free(rwlock_t *rwlock);
 
 #endif
