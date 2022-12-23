@@ -1,7 +1,7 @@
 # Projeto de Sistemas Operativos 2022-2023
 
 Este repositório alberga o projeto de SO realizado pelos alunos Fábio Neto (104126) e Henrique Silva
-(103606) no âmbito da cadeira de Sistemas Operativos do Instituto Superior Técnico dirigda pelo
+(103606) no âmbito da cadeira de Sistemas Operativos do Instituto Superior Técnico dirigida pelo
 professor responsável José Manuel da Costa Alves Marques.
 
 O repositório encontra-se dividido em branches de modo a facilitar a busca pela informação:
