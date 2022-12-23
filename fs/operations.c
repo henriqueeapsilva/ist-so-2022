@@ -1,6 +1,7 @@
 #include "operations.h"
 #include "config.h"
 #include "state.h"
+#include "thread.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,17 +29,14 @@ int tfs_init(tfs_params const *params_ptr) {
   }
 
   // create root inode
-  int root = inode_create(T_DIRECTORY);
-  if (root != ROOT_DIR_INUM) {
+  if (inode_create(T_DIRECTORY) != ROOT_DIR_INUM) {
     return -1;
   }
 
   return 0;
 }
 
-int tfs_destroy() {
-  return state_destroy();
-}
+int tfs_destroy() { return state_destroy(); }
 
 static bool valid_pathname(char const *name) {
   return (name != NULL) && (strlen(name) > 1) && (name[0] == '/');
@@ -69,12 +67,13 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 
   inode_t *inode = NULL;
 
-  int inum = find_in_dir(ROOT_DIR_INODE, name+1);
+  int inum = find_in_dir(ROOT_DIR_INODE, name + 1);
   size_t offset = 0;
 
   if (inum >= 0) {
     inode = inode_get(inum);
-    ALWAYS_ASSERT((inode != NULL), "tfs_open: directory files must have an inode");
+    ALWAYS_ASSERT((inode != NULL),
+                  "tfs_open: directory files must have an inode");
 
     if (inode->i_node_type == T_LINK) {
       char *block = data_block_get(inode->i_bnumber);
@@ -202,7 +201,7 @@ int tfs_sym_link(char const *target, char const *link_name) {
     return -1;
   }
 
-  if (find_in_dir(ROOT_DIR_INODE, link_name+1) >= 0) {
+  if (find_in_dir(ROOT_DIR_INODE, link_name + 1) >= 0) {
     return -1; // file already exists
   }
 
@@ -226,13 +225,13 @@ int tfs_sym_link(char const *target, char const *link_name) {
     return -1;
   }
 
-  strncpy(block, target, MAX_FILE_NAME-1);
-  block[MAX_FILE_NAME-1] = '\0';
+  strncpy(block, target, MAX_FILE_NAME - 1);
+  block[MAX_FILE_NAME - 1] = '\0';
   return 0;
 }
 
 int tfs_link(char const *target, char const *link_name) {
-  int inum = find_in_dir(ROOT_DIR_INODE, target+1);
+  int inum = find_in_dir(ROOT_DIR_INODE, target + 1);
   if (inum == -1) {
     return -1;
   }
@@ -242,7 +241,7 @@ int tfs_link(char const *target, char const *link_name) {
     return -1;
   }
 
-  if (add_dir_entry(ROOT_DIR_INODE, link_name+1, inum) == -1) {
+  if (add_dir_entry(ROOT_DIR_INODE, link_name + 1, inum) == -1) {
     return -1;
   }
 
@@ -251,7 +250,7 @@ int tfs_link(char const *target, char const *link_name) {
 }
 
 int tfs_unlink(char const *target) {
-  int inum = find_in_dir(ROOT_DIR_INODE, target+1);
+  int inum = find_in_dir(ROOT_DIR_INODE, target + 1);
   if (inum < 0) {
     return -1;
   }
@@ -261,24 +260,24 @@ int tfs_unlink(char const *target) {
     return -1;
   }
 
-  if (clear_dir_entry(ROOT_DIR_INODE, target+1) == -1) {
+  if (clear_dir_entry(ROOT_DIR_INODE, target + 1) == -1) {
     return -1;
   }
 
   if (--inode->i_links > 0) {
     return 0;
   }
-  
+
   if (!find_open_file_entry(inum)) {
     inode_delete(inum);
   }
-  
+
   return 0;
 }
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
   char buffer[state_block_size()];
-  
+
   FILE *file = fopen(source_path, "r");
   if (!file) {
     return -1;
