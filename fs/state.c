@@ -184,7 +184,7 @@ static int inode_alloc(void) {
  * Allocates and initializes a new inode.
  * Directories will have their data block allocated and initialized, with i_size
  * set to BLOCK_SIZE. Regular files will not have their data block allocated
- * (i_size will be set to 0, i_data_block to -1).
+ * (i_size will be set to 0, i_bnumber to -1).
  *
  * Input:
  *   - i_type: the type of the node (file or directory)
@@ -195,7 +195,7 @@ static int inode_alloc(void) {
  *   - No free slots in inode table.
  *   - (if creating a directory) No free data blocks.
  */
-int inode_create(inode_type i_type) {
+int inode_create(inode_type type) {
   int inumber = inode_alloc();
   if (inumber == -1) {
     return -1; // no free slots in inode table
@@ -204,9 +204,9 @@ int inode_create(inode_type i_type) {
   inode_t *inode = &inode_table[inumber];
   insert_delay(); // simulate storage access delay (to inode)
 
-  inode->i_node_type = i_type;
+  inode->i_node_type = type;
   inode->i_links = 1;
-  switch (i_type) {
+  switch (type) {
   case T_DIRECTORY: {
     // Initializes directory (filling its block with empty entries, labeled
     // with inumber==-1)
@@ -214,7 +214,7 @@ int inode_create(inode_type i_type) {
     if (b == -1) {
       // ensure fields are initialized
       inode->i_size = 0;
-      inode->i_data_block = -1;
+      inode->i_bnumber = -1;
 
       // run regular deletion process
       inode_delete(inumber);
@@ -222,7 +222,7 @@ int inode_create(inode_type i_type) {
     }
 
     inode->i_size = BLOCK_SIZE;
-    inode->i_data_block = b;
+    inode->i_bnumber = b;
 
     dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(b);
     ALWAYS_ASSERT(dir_entry != NULL,
@@ -236,7 +236,7 @@ int inode_create(inode_type i_type) {
   case T_FILE:
     // In case of a new file, simply sets its size to 0
     inode->i_size = 0;
-    inode->i_data_block = -1;
+    inode->i_bnumber = -1;
     break;
   default:
     PANIC("inode_create: unknown file type");
@@ -262,7 +262,7 @@ void inode_delete(int inumber) {
                 "inode_delete: inode already freed");
 
   if (inode_table[inumber].i_size > 0) {
-    data_block_free(inode_table[inumber].i_data_block);
+    data_block_free(inode_table[inumber].i_bnumber);
   }
 
   freeinode_ts[inumber] = FREE;
@@ -284,8 +284,9 @@ inode_t *inode_get(int inumber) {
 }
 
 void inode_free(int inumber) {
-    data_block_free(inode_table[inumber].i_data_block);
+    data_block_free(inode_table[inumber].i_bnumber);
     inode_table[inumber].i_size = 0;
+    inode_table[inumber].i_links = 0;
 }
 
 /**
@@ -301,26 +302,20 @@ void inode_free(int inumber) {
  *   - inode is not a directory inode.
  *   - Directory does not contain an entry for sub_name.
  */
-int clear_dir_entry(inode_t *inode_dir, char const *sub_name) {
+int clear_dir_entry(inode_t *dir, char const *sub_name) {
   insert_delay();
-  if (inode_dir->i_node_type != T_DIRECTORY) {
+  if (dir->i_node_type != T_DIRECTORY) {
     return -1; // not a directory
   }
 
   // Locates the block containing the entries of the directory
-  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode_dir->i_data_block);
+  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(dir->i_bnumber);
   ALWAYS_ASSERT(dir_entry != NULL,
                 "clear_dir_entry: directory must have a data block");
 
   for (size_t i = 0; i < MAX_DIR_ENTRIES; i++) {
     if (!strcmp(dir_entry[i].d_name, sub_name)) {
       memset(dir_entry[i].d_name, 0, MAX_FILE_NAME);
-      
-      inode_t *inode = inode_get(dir_entry[i].d_inumber);
-      if (inode && (--inode->i_links == 0)) {
-        inode_delete(dir_entry[i].d_inumber);
-      }
-
       dir_entry[i].d_inumber = -1;
       return 0;
     }
@@ -343,23 +338,18 @@ int clear_dir_entry(inode_t *inode_dir, char const *sub_name) {
  *   - sub_name is not a valid file name (length 0 or > MAX_FILE_NAME - 1).
  *   - Directory is already full of entries.
  */
-int add_dir_entry(inode_t *inode_dir, char const *sub_name, int sub_inumber) {
+int add_dir_entry(inode_t *dir, char const *sub_name, int sub_inumber) {
   if (strlen(sub_name) == 0 || strlen(sub_name) > MAX_FILE_NAME - 1) {
     return -1; // invalid sub_name
   }
 
   insert_delay(); // simulate storage access delay to inode with inumber
-  if (inode_dir->i_node_type != T_DIRECTORY) {
+  if (dir->i_node_type != T_DIRECTORY) {
     return -1; // not a directory
   }
 
-  inode_t *inode = inode_get(sub_inumber);
-  if (!inode) {
-    return -1; // inode does not exist
-  }
-
   // Locates the block containing the entries of the directory
-  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode_dir->i_data_block);
+  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(dir->i_bnumber);
   ALWAYS_ASSERT(dir_entry != NULL,
                 "add_dir_entry: directory must have a data block");
 
@@ -369,7 +359,6 @@ int add_dir_entry(inode_t *inode_dir, char const *sub_name, int sub_inumber) {
       dir_entry[i].d_inumber = sub_inumber;
       strncpy(dir_entry[i].d_name, sub_name, MAX_FILE_NAME - 1);
       dir_entry[i].d_name[MAX_FILE_NAME - 1] = '\0';
-      inode->i_links++;
       return 0;
     }
   }
@@ -390,17 +379,17 @@ int add_dir_entry(inode_t *inode_dir, char const *sub_name, int sub_inumber) {
  *   - inode is not a directory inode.
  *   - Directory does not contain a file named sub_name.
  */
-int find_in_dir(inode_t const *inode, char const *sub_name) {
-  ALWAYS_ASSERT(inode != NULL, "find_in_dir: inode must be non-NULL");
+int find_in_dir(inode_t const *dir, char const *sub_name) {
+  ALWAYS_ASSERT(dir != NULL, "find_in_dir: inode must be non-NULL");
   ALWAYS_ASSERT(sub_name != NULL, "find_in_dir: sub_name must be non-NULL");
 
   insert_delay(); // simulate storage access delay to inode with inumber
-  if (inode->i_node_type != T_DIRECTORY) {
+  if (dir->i_node_type != T_DIRECTORY) {
     return -1; // not a directory
   }
 
   // Locates the block containing the entries of the directory
-  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_data_block);
+  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(dir->i_bnumber);
   ALWAYS_ASSERT(dir_entry != NULL,
                 "find_in_dir: directory inode must have a data block");
 

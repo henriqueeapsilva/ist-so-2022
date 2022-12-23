@@ -67,16 +67,17 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
     return -1;
   }
 
+  inode_t *inode = NULL;
+
   int inum = find_in_dir(ROOT_DIR_INODE, name+1);
   size_t offset = 0;
-  inode_t *inode = NULL;
 
   if (inum >= 0) {
     inode = inode_get(inum);
-    ALWAYS_ASSERT(inode != NULL, "tfs_open: directory files must have an inode");
+    ALWAYS_ASSERT((inode != NULL), "tfs_open: directory files must have an inode");
 
     if (inode->i_node_type == T_LINK) {
-      char *block = data_block_get(inode->i_data_block);
+      char *block = data_block_get(inode->i_bnumber);
       if (!block) {
         return -1;
       }
@@ -134,13 +135,13 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
   if (to_write > 0) {
     if (inode->i_size == 0) {
-      inode->i_data_block = data_block_alloc();
-      if (inode->i_data_block == -1) {
+      inode->i_bnumber = data_block_alloc();
+      if (inode->i_bnumber == -1) {
         return -1; // no space
       }
     }
 
-    void *block = data_block_get(inode->i_data_block);
+    void *block = data_block_get(inode->i_bnumber);
     ALWAYS_ASSERT(block != NULL, "tfs_write: data block deleted mid-write");
 
     memcpy((block + file->of_offset), buffer, to_write);
@@ -170,7 +171,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
   }
 
   if (to_read > 0) {
-    void *block = data_block_get(inode->i_data_block);
+    void *block = data_block_get(inode->i_bnumber);
     ALWAYS_ASSERT(block != NULL, "tfs_read: data block deleted mid-read");
 
     // Perform the actual read
@@ -205,12 +206,12 @@ int tfs_sym_link(char const *target, char const *link_name) {
     return -1;
   }
 
-  inode->i_data_block = data_block_alloc();
-  if (inode->i_data_block == -1) {
+  inode->i_bnumber = data_block_alloc();
+  if (inode->i_bnumber == -1) {
     return -1;
   }
 
-  char *block = data_block_get(inode->i_data_block);
+  char *block = data_block_get(inode->i_bnumber);
   if (!block) {
     return -1;
   }
@@ -231,11 +232,34 @@ int tfs_link(char const *target, char const *link_name) {
     return -1;
   }
 
-  return add_dir_entry(ROOT_DIR_INODE, link_name+1, inum);
+  if (add_dir_entry(ROOT_DIR_INODE, link_name+1, inum) == -1) {
+    return -1;
+  }
+
+  inode->i_links++;
+  return 0;
 }
 
 int tfs_unlink(char const *target) {
-  return clear_dir_entry(ROOT_DIR_INODE, target+1);
+  int inum = find_in_dir(ROOT_DIR_INODE, target+1);
+  if (inum == 0) {
+    return -1;
+  }
+
+  inode_t *inode = inode_get(inum);
+  if (!inode) {
+    return -1;
+  }
+
+  if (clear_dir_entry(ROOT_DIR_INODE, target+1) == -1) {
+    return -1;
+  }
+
+  if (--inode->i_links == 0) {
+    inode_delete(inum);
+  }
+
+  return 0;
 }
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
@@ -273,7 +297,7 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     return -1;
   }
 
-  inode->i_data_block = bnum;
+  inode->i_bnumber = bnum;
   inode->i_size = size;
   return 0;
 }
