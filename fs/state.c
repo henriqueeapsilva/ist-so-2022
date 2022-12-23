@@ -36,15 +36,15 @@ static allocation_state_t *free_open_file_entries;
 #define MAX_DIR_ENTRIES (BLOCK_SIZE / sizeof(dir_entry_t))
 
 static inline bool valid_inumber(int inumber) {
-  return inumber >= 0 && inumber < INODE_TABLE_SIZE;
+  return (inumber >= 0) && (inumber < INODE_TABLE_SIZE);
 }
 
 static inline bool valid_block_number(int block_number) {
-  return block_number >= 0 && block_number < DATA_BLOCKS;
+  return (block_number >= 0) && (block_number < DATA_BLOCKS);
 }
 
 static inline bool valid_file_handle(int file_handle) {
-  return file_handle >= 0 && file_handle < MAX_OPEN_FILES;
+  return (file_handle >= 0) && (file_handle < MAX_OPEN_FILES);
 }
 
 size_t state_block_size(void) { return BLOCK_SIZE; }
@@ -99,10 +99,13 @@ int state_init(tfs_params params) {
     return -1; // already initialized
   }
 
+  // inodes
   inode_table = malloc(INODE_TABLE_SIZE * sizeof(inode_t));
   freeinode_ts = malloc(INODE_TABLE_SIZE * sizeof(allocation_state_t));
+  // blocks
   fs_data = malloc(DATA_BLOCKS * BLOCK_SIZE);
   free_blocks = malloc(DATA_BLOCKS * sizeof(allocation_state_t));
+  // open files
   open_file_table = malloc(MAX_OPEN_FILES * sizeof(open_file_entry_t));
   free_open_file_entries = malloc(MAX_OPEN_FILES * sizeof(allocation_state_t));
 
@@ -164,9 +167,7 @@ static int inode_alloc(void) {
       insert_delay(); // simulate storage access delay (to freeinode_ts)
     }
 
-    // Finds first free entry in inode table
     if (freeinode_ts[inumber] == FREE) {
-      //  Found a free entry, so takes it for the new inode
       freeinode_ts[inumber] = TAKEN;
 
       return (int)inumber;
@@ -204,6 +205,7 @@ int inode_create(inode_type i_type) {
   insert_delay(); // simulate storage access delay (to inode)
 
   inode->i_node_type = i_type;
+  inode->i_links = 1;
   switch (i_type) {
   case T_DIRECTORY: {
     // Initializes directory (filling its block with empty entries, labeled
@@ -219,8 +221,8 @@ int inode_create(inode_type i_type) {
       return -1;
     }
 
-    inode_table[inumber].i_size = BLOCK_SIZE;
-    inode_table[inumber].i_data_block = b;
+    inode->i_size = BLOCK_SIZE;
+    inode->i_data_block = b;
 
     dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(b);
     ALWAYS_ASSERT(dir_entry != NULL,
@@ -230,10 +232,11 @@ int inode_create(inode_type i_type) {
       dir_entry[i].d_inumber = -1;
     }
   } break;
+  case T_LINK:
   case T_FILE:
     // In case of a new file, simply sets its size to 0
-    inode_table[inumber].i_size = 0;
-    inode_table[inumber].i_data_block = -1;
+    inode->i_size = 0;
+    inode->i_data_block = -1;
     break;
   default:
     PANIC("inode_create: unknown file type");
@@ -280,6 +283,11 @@ inode_t *inode_get(int inumber) {
   return &inode_table[inumber];
 }
 
+void inode_free(int inumber) {
+    data_block_free(inode_table[inumber].i_data_block);
+    inode_table[inumber].i_size = 0;
+}
+
 /**
  * Clear the directory entry associated with a sub file.
  *
@@ -293,21 +301,27 @@ inode_t *inode_get(int inumber) {
  *   - inode is not a directory inode.
  *   - Directory does not contain an entry for sub_name.
  */
-int clear_dir_entry(inode_t *inode, char const *sub_name) {
+int clear_dir_entry(inode_t *inode_dir, char const *sub_name) {
   insert_delay();
-  if (inode->i_node_type != T_DIRECTORY) {
+  if (inode_dir->i_node_type != T_DIRECTORY) {
     return -1; // not a directory
   }
 
   // Locates the block containing the entries of the directory
-  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_data_block);
+  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode_dir->i_data_block);
   ALWAYS_ASSERT(dir_entry != NULL,
                 "clear_dir_entry: directory must have a data block");
 
   for (size_t i = 0; i < MAX_DIR_ENTRIES; i++) {
     if (!strcmp(dir_entry[i].d_name, sub_name)) {
-      dir_entry[i].d_inumber = -1;
       memset(dir_entry[i].d_name, 0, MAX_FILE_NAME);
+      
+      inode_t *inode = inode_get(dir_entry[i].d_inumber);
+      if (inode && (--inode->i_links == 0)) {
+        inode_delete(dir_entry[i].d_inumber);
+      }
+
+      dir_entry[i].d_inumber = -1;
       return 0;
     }
   }
@@ -329,18 +343,23 @@ int clear_dir_entry(inode_t *inode, char const *sub_name) {
  *   - sub_name is not a valid file name (length 0 or > MAX_FILE_NAME - 1).
  *   - Directory is already full of entries.
  */
-int add_dir_entry(inode_t *inode, char const *sub_name, int sub_inumber) {
+int add_dir_entry(inode_t *inode_dir, char const *sub_name, int sub_inumber) {
   if (strlen(sub_name) == 0 || strlen(sub_name) > MAX_FILE_NAME - 1) {
     return -1; // invalid sub_name
   }
 
   insert_delay(); // simulate storage access delay to inode with inumber
-  if (inode->i_node_type != T_DIRECTORY) {
+  if (inode_dir->i_node_type != T_DIRECTORY) {
     return -1; // not a directory
   }
 
+  inode_t *inode = inode_get(sub_inumber);
+  if (!inode) {
+    return -1; // inode does not exist
+  }
+
   // Locates the block containing the entries of the directory
-  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_data_block);
+  dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode_dir->i_data_block);
   ALWAYS_ASSERT(dir_entry != NULL,
                 "add_dir_entry: directory must have a data block");
 
@@ -350,7 +369,7 @@ int add_dir_entry(inode_t *inode, char const *sub_name, int sub_inumber) {
       dir_entry[i].d_inumber = sub_inumber;
       strncpy(dir_entry[i].d_name, sub_name, MAX_FILE_NAME - 1);
       dir_entry[i].d_name[MAX_FILE_NAME - 1] = '\0';
-
+      inode->i_links++;
       return 0;
     }
   }
