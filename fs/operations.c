@@ -192,9 +192,13 @@ int tfs_sym_link(char const *target, char const *link_name) {
     return -1;
   }
 
+  if (find_in_dir(ROOT_DIR_INODE, link_name+1) >= 0) {
+    return -1; // file already exists
+  }
+
   int inum = tfs_create(link_name, T_LINK);
   if (inum == -1) {
-    return -1;
+    return -1; // file could not be created
   }
 
   inode_t *inode = inode_get(inum);

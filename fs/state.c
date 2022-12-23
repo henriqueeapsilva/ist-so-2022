@@ -399,8 +399,7 @@ int find_in_dir(inode_t const *dir, char const *sub_name) {
     if ((dir_entry[i].d_inumber != -1) &&
         (strncmp(dir_entry[i].d_name, sub_name, MAX_FILE_NAME) == 0)) {
 
-      int sub_inumber = dir_entry[i].d_inumber;
-      return sub_inumber;
+      return dir_entry[i].d_inumber;
     }
 
   return -1; // entry not found
