@@ -598,7 +598,7 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
   return entry;
 }
 
-open_file_entry_t *find_open_file_entry(int inumber) {
+int find_open_file_entry(int inumber) {
   rdlock_open_file_table();
   for (int i = 0; i < MAX_OPEN_FILES; i++) {
     if (free_open_file_entries[i] == FREE) {
@@ -606,14 +606,13 @@ open_file_entry_t *find_open_file_entry(int inumber) {
     }
 
     if (open_file_table[i].of_inumber == inumber) {
-      open_file_entry_t *entry = &open_file_table[i];
       unlock_open_file_table();
-      return entry;
+      return i;
     }
   }
 
   unlock_open_file_table();
-  return NULL;
+  return -1;
 }
 
 void wrlock_inode_table() { rwlock_wrlock(inode_table_lock); }

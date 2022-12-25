@@ -120,7 +120,7 @@ int tfs_close(int fhandle) {
     return 0;
   }
 
-  if (!find_open_file_entry(file->of_inumber)) {
+  if (find_open_file_entry(file->of_inumber) < 0) {
     inode_delete(file->of_inumber);
   }
 
@@ -268,7 +268,7 @@ int tfs_unlink(char const *target) {
     return 0;
   }
 
-  if (!find_open_file_entry(inum)) {
+  if (find_open_file_entry(inum) < 0) {
     inode_delete(inum);
   }
 
