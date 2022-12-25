@@ -253,38 +253,29 @@ int inode_create(inode_type type) {
   inode_t *inode = &inode_table[inumber];
   insert_delay(); // simulate storage access delay (to inode)
 
-  inode->i_node_type = type;
+  inode->i_type = type;
   inode->i_links = 1;
   switch (type) {
   case T_DIRECTORY: {
-    // Initializes directory (filling its block with empty entries, labeled
-    // with inumber==-1)
-    int b = data_block_alloc();
-    if (b == -1) {
-      // ensure fields are initialized
-      inode->i_size = 0;
-      inode->i_bnumber = -1;
+    inode->i_size = BLOCK_SIZE;
+    inode->i_bnumber = data_block_alloc();
 
-      // run regular deletion process
+    if (inode->i_bnumber < 0) {
       inode_delete(inumber);
       unlock_inode_table();
       return -1;
     }
 
-    inode->i_size = BLOCK_SIZE;
-    inode->i_bnumber = b;
-
-    dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(b);
+    dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_bnumber);
     ALWAYS_ASSERT(dir_entry != NULL,
                   "inode_create: data block freed while in use");
 
-    for (size_t i = 0; i < MAX_DIR_ENTRIES; i++) {
-      dir_entry[i].d_inumber = -1;
+    for (size_t i = 0; i < MAX_DIR_ENTRIES;) {
+      dir_entry[i++].d_inumber = -1;
     }
   } break;
   case T_LINK:
   case T_FILE:
-    // In case of a new file, simply sets its size to 0
     inode->i_size = 0;
     inode->i_bnumber = -1;
     break;
@@ -339,14 +330,6 @@ inode_t *inode_get(int inumber) {
   return inode;
 }
 
-void inode_free(int inumber) {
-  wrlock_inode_table();
-  data_block_free(inode_table[inumber].i_bnumber);
-  inode_table[inumber].i_size = 0;
-  inode_table[inumber].i_links = 0;
-  unlock_inode_table();
-}
-
 /**
  * Clear the directory entry associated with a sub file.
  *
@@ -362,7 +345,7 @@ void inode_free(int inumber) {
  */
 int clear_dir_entry(inode_t *dir, char const *sub_name) {
   insert_delay();
-  if (dir->i_node_type != T_DIRECTORY) {
+  if (dir->i_type != T_DIRECTORY) {
     return -1; // not a directory
   }
 
@@ -403,7 +386,7 @@ int add_dir_entry(inode_t *dir, char const *sub_name, int sub_inumber) {
   }
 
   insert_delay(); // simulate storage access delay to inode with inumber
-  if (dir->i_node_type != T_DIRECTORY) {
+  if (dir->i_type != T_DIRECTORY) {
     return -1; // not a directory
   }
 
@@ -443,7 +426,7 @@ int find_in_dir(inode_t const *dir, char const *sub_name) {
   ALWAYS_ASSERT(sub_name != NULL, "find_in_dir: sub_name must be non-NULL");
 
   insert_delay(); // simulate storage access delay to inode with inumber
-  if (dir->i_node_type != T_DIRECTORY) {
+  if (dir->i_type != T_DIRECTORY) {
     return -1; // not a directory
   }
 
