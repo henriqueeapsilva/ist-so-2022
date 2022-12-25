@@ -75,8 +75,11 @@ void unlock_block_table();
 void wrlock_open_file_table();
 void rdlock_open_file_table();
 void unlock_open_file_table();
-void wrlock_block(int bnum);
-void rdlock_block(int bnum);
-void unlock_block(int bnum);
+void wrlock_inode(int inum);
+void rdlock_inode(int inum);
+void unlock_inode(int inum);
+void wrlock_open_file(int fhandle);
+void rdlock_open_file(int fhandle);
+void unlock_open_file(int fhandle);
 
 #endif // STATE_H
