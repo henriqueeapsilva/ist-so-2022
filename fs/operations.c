@@ -112,20 +112,22 @@ int tfs_close(int fhandle) {
 
   remove_from_open_file_table(fhandle);
 
-  unlock_open_file(fhandle);
-  wrlock_inode(file->of_inumber);
+  int inum = file->of_inumber;
 
-  inode_t *inode = inode_get(file->of_inumber);
+  wrlock_inode(inum);
+  unlock_open_file(fhandle);
+
+  inode_t *inode = inode_get(inum);
   if (!inode || (inode->i_links > 0)) {
-    unlock_inode(file->of_inumber);
+    unlock_inode(inum);
     return 0;
   }
 
-  if (find_open_file_entry(file->of_inumber) < 0) {
-    inode_delete(file->of_inumber);
+  if (find_open_file_entry(inum) < 0) {
+    inode_delete(inum);
   }
 
-  unlock_inode(file->of_inumber);
+  unlock_inode(inum);
   return 0;
 }
 
@@ -141,7 +143,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
   wrlock_inode(file->of_inumber);
 
   inode_t *inode = inode_get(file->of_inumber);
-  ALWAYS_ASSERT(inode != NULL, "tfs_write: inode of open file deleted");
+  ALWAYS_ASSERT(inode, "tfs_write: inode of open file deleted");
 
   // Determine how many bytes to write
   size_t block_size = state_block_size();

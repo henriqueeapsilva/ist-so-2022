@@ -32,11 +32,11 @@ static allocation_state_t *free_open_file_entries;
 /*
  * Synchronization
  */
-static rwlock_t *inode_table_lock;
-static rwlock_t *block_table_lock;
-static rwlock_t *open_file_table_lock;
-static rwlock_t **inode_locks;
-static rwlock_t **open_file_locks;
+static rwlock_t inode_table_lock;
+static rwlock_t block_table_lock;
+static rwlock_t open_file_table_lock;
+static rwlock_t *inode_locks;
+static rwlock_t *open_file_locks;
 
 // Convenience macros
 #define INODE_TABLE_SIZE (fs_params.max_inode_count)
@@ -119,25 +119,17 @@ int state_init(tfs_params params) {
   open_file_table = malloc(MAX_OPEN_FILES * sizeof(open_file_entry_t));
   free_open_file_entries = malloc(MAX_OPEN_FILES * sizeof(allocation_state_t));
   // locks
-  inode_table_lock = rwlock_alloc();
-  block_table_lock = rwlock_alloc();
-  open_file_table_lock = rwlock_alloc();
   inode_locks = malloc(INODE_TABLE_SIZE * sizeof(rwlock_t));
   open_file_locks = malloc(MAX_OPEN_FILES * sizeof(rwlock_t));
 
   if (!inode_table || !freeinode_ts || !fs_data || !free_blocks ||
-      !open_file_table || !free_open_file_entries || !inode_table_lock ||
-      !open_file_table_lock || !inode_locks || !open_file_locks) {
+      !open_file_table || !free_open_file_entries || !inode_locks || !open_file_locks) {
     return -1; // allocation failed
   }
 
   for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
     freeinode_ts[i] = FREE;
-    inode_locks[i] = rwlock_alloc();
-
-    if (!inode_locks[i]) {
-      return -1;
-    }
+    rwlock_init(&inode_locks[i]);
   }
 
   for (size_t i = 0; i < DATA_BLOCKS; i++) {
@@ -146,14 +138,14 @@ int state_init(tfs_params params) {
 
   for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
     free_open_file_entries[i] = FREE;
-    open_file_locks[i] = rwlock_alloc();
-
-    if (!open_file_locks[i]) {
-      return -1;
-    }
+    rwlock_init(&open_file_locks[i]);
   }
 
-  return 0;
+  rwlock_init(&inode_table_lock);
+  rwlock_init(&block_table_lock);
+  rwlock_init(&open_file_table_lock);
+
+  return EXIT_SUCCESS;
 }
 
 /**
@@ -163,18 +155,19 @@ int state_init(tfs_params params) {
  */
 int state_destroy(void) {
   for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
-    rwlock_free(inode_locks[i]);
-    inode_locks[i] = NULL;
+    rwlock_destroy(&inode_locks[i]);
   }
 
   for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
-    rwlock_free(open_file_locks[i]);
-    open_file_locks[i] = NULL;
+    rwlock_destroy(&open_file_locks[i]);
   }
 
-  rwlock_free(inode_table_lock);
-  rwlock_free(block_table_lock);
-  rwlock_free(open_file_table_lock);
+  free(inode_locks);
+  free(open_file_locks);
+
+  rwlock_destroy(&inode_table_lock);
+  rwlock_destroy(&block_table_lock);
+  rwlock_destroy(&open_file_table_lock);
 
   free(inode_table);
   free(freeinode_ts);
@@ -182,8 +175,6 @@ int state_destroy(void) {
   free(free_blocks);
   free(open_file_table);
   free(free_open_file_entries);
-  free(inode_locks);
-  free(open_file_locks);
 
   inode_table = NULL;
   freeinode_ts = NULL;
@@ -191,9 +182,6 @@ int state_destroy(void) {
   free_blocks = NULL;
   open_file_table = NULL;
   free_open_file_entries = NULL;
-  inode_table_lock = NULL;
-  block_table_lock = NULL;
-  open_file_table_lock = NULL;
   inode_locks = NULL;
   open_file_locks = NULL;
   return 0;
@@ -528,8 +516,10 @@ int add_to_open_file_table(int inumber, size_t offset) {
   for (int i = 0; i < MAX_OPEN_FILES; i++) {
     if (free_open_file_entries[i] == FREE) {
       free_open_file_entries[i] = TAKEN;
+      wrlock_open_file(i);
       open_file_table[i].of_inumber = inumber;
       open_file_table[i].of_offset = offset;
+      unlock_open_file(i);
       unlock_open_file_table();
       return (int)i;
     }
@@ -598,32 +588,32 @@ int find_open_file_entry(int inumber) {
   return -1;
 }
 
-void wrlock_inode_table() { rwlock_wrlock(inode_table_lock); }
+void wrlock_inode_table() { rwlock_wrlock(&inode_table_lock); }
 
-void rdlock_inode_table() { rwlock_rdlock(inode_table_lock); }
+void rdlock_inode_table() { rwlock_rdlock(&inode_table_lock); }
 
-void unlock_inode_table() { rwlock_unlock(inode_table_lock); }
+void unlock_inode_table() { rwlock_unlock(&inode_table_lock); }
 
-void wrlock_block_table() { rwlock_wrlock(block_table_lock); }
+void wrlock_block_table() { rwlock_wrlock(&block_table_lock); }
 
-void rdlock_block_table() { rwlock_rdlock(block_table_lock); }
+void rdlock_block_table() { rwlock_rdlock(&block_table_lock); }
 
-void unlock_block_table() { rwlock_unlock(block_table_lock); }
+void unlock_block_table() { rwlock_unlock(&block_table_lock); }
 
-void wrlock_open_file_table() { rwlock_wrlock(open_file_table_lock); }
+void wrlock_open_file_table() { rwlock_wrlock(&open_file_table_lock); }
 
-void rdlock_open_file_table() { rwlock_rdlock(open_file_table_lock); }
+void rdlock_open_file_table() { rwlock_rdlock(&open_file_table_lock); }
 
-void unlock_open_file_table() { rwlock_unlock(open_file_table_lock); }
+void unlock_open_file_table() { rwlock_unlock(&open_file_table_lock); }
 
-void wrlock_inode(int inum) { rwlock_wrlock(inode_locks[inum]); }
+void wrlock_inode(int inum) { rwlock_wrlock(&inode_locks[inum]); }
 
-void rdlock_inode(int inum) { rwlock_rdlock(inode_locks[inum]); }
+void rdlock_inode(int inum) { rwlock_rdlock(&inode_locks[inum]); }
 
-void unlock_inode(int inum) { rwlock_unlock(inode_locks[inum]); }
+void unlock_inode(int inum) { rwlock_unlock(&inode_locks[inum]); }
 
-void wrlock_open_file(int fhandle) { rwlock_wrlock(open_file_locks[fhandle]); }
+void wrlock_open_file(int fhandle) { rwlock_wrlock(&open_file_locks[fhandle]); }
 
-void rdlock_open_file(int fhandle) { rwlock_rdlock(open_file_locks[fhandle]); }
+void rdlock_open_file(int fhandle) { rwlock_rdlock(&open_file_locks[fhandle]); }
 
-void unlock_open_file(int fhandle) { rwlock_unlock(open_file_locks[fhandle]); }
+void unlock_open_file(int fhandle) { rwlock_unlock(&open_file_locks[fhandle]); }
