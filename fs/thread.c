@@ -2,6 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void thread_create(thread_t *thread, void *(*func)(void*), void *arg) {
+  if (pthread_create(thread, NULL, func, arg)) {
+    fprintf(stderr, "Could not create thread.\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+void thread_join(thread_t *thread, void **result) {
+  if (pthread_join(*thread, result)) {
+    fprintf(stderr, "Could not create thread.\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
 void mutex_init(mutex_t *mutex) {
   if (pthread_mutex_init(mutex, NULL)) {
     fprintf(stderr, "Could not initialize mutex.\n");
