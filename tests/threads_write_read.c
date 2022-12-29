@@ -22,7 +22,11 @@ int main() {
     }
 
     for (int i = 0; i < FILES; i++) {
-        thread_create(&thread[i], write, (filename+i));
+        /*
+         * Each thread will create a file and write to it,
+         * then read and check if the content was written as intended.
+         */
+        thread_create(&thread[i], write, *(filename+i));
     }
 
     for (int i = 0; i < FILES; i++) {
@@ -35,7 +39,7 @@ int main() {
 }
 
 void *write(void* arg) {
-    char *filename = ((char*) arg);
+    char *filename = (char*) arg;
 
     size_t len = strlen(content);
     char buffer[len];

@@ -1,40 +1,45 @@
 #include "fs/operations.h"
+#include "fs/thread.h"
 #include <assert.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define FILES (20)
 
-char filename[FILES][6];
 char const content[] = "A";
 
 void *openclose(void*);
-void assert_content(int);
+void assert_content(char*);
 
 int main() {
     pthread_t thread[FILES];
-    int index[FILES];
+    char filename[FILES][MAX_FILE_NAME];
 
     assert(tfs_init(NULL) != -1);
 
     for (int i = 0; i < FILES; i++) {
-        index[i] = i;
         snprintf(filename[i], 6, "/f%d", i);
-        filename[i][5] = '\0';
     }
 
     for (int i = 0; i < FILES; i++) {
-        assert(!pthread_create(&thread[i], NULL, (void*) (openclose), (index+i)));
+        /*
+         * Each thread will try to:
+         * 1. Open (and create) a different file.
+         * 2. Write a predefined content to it.
+         * 3. Close the file.
+         * 
+         * This is a very simple test. 
+         */
+        thread_create(&thread[i], openclose, *(filename+i));
     }
 
     for (int i = 0; i < FILES; i++) {
-        assert(!pthread_join(thread[i], NULL));
+        thread_join(&thread[i], NULL);
     }
 
     for (int i = 0; i < FILES; i++) {
-        assert_content(i);
+        assert_content(filename[i]);
     }
 
     assert(tfs_destroy() != -1);
@@ -45,24 +50,22 @@ int main() {
 }
 
 void *openclose(void* arg) {
-    int i = *((int*) arg);
+    char *filename = (char*) arg;
 
-    int f = tfs_open(filename[i], TFS_O_CREAT);
+    int f = tfs_open(filename, TFS_O_CREAT);
     assert(f != -1);
 
-    assert(tfs_write(f, content, 1) == 1);
-
+    assert(tfs_write(f, content, strlen(content)) == strlen(content));
     assert(tfs_close(f) != -1);
 
     return NULL;
 }
 
-void assert_content(int i) {
-    char buffer[5];
+void assert_content(char *filename) {
+    char buffer[sizeof(content)+5];
 
-    int f = tfs_open(filename[i], TFS_O_CREAT);
+    int f = tfs_open(filename, TFS_O_CREAT);
     assert(f != -1);
-
-    assert(tfs_read(f, buffer, 5) == 1);
+    assert(tfs_read(f, buffer, sizeof(content)+5) == strlen(content));
     assert(tfs_close(f) != -1);
 }
