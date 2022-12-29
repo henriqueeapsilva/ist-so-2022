@@ -244,31 +244,31 @@ int inode_create(inode_type type) {
   inode->i_type = type;
   inode->i_links = 1;
   switch (type) {
-  case T_DIRECTORY: {
-    inode->i_size = BLOCK_SIZE;
-    inode->i_bnumber = data_block_alloc();
+    case T_DIRECTORY:
+      inode->i_size = BLOCK_SIZE;
+      inode->i_bnumber = data_block_alloc();
 
-    if (inode->i_bnumber < 0) {
-      inode_delete(inumber);
-      unlock_inode_table();
-      return -1;
-    }
+      if (inode->i_bnumber < 0) {
+        inode_delete(inumber);
+        unlock_inode_table();
+        return -1;
+      }
 
-    dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_bnumber);
-    ALWAYS_ASSERT(dir_entry != NULL,
-                  "inode_create: data block freed while in use");
+      dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_bnumber);
+      ALWAYS_ASSERT(dir_entry != NULL,
+                    "inode_create: data block freed while in use");
 
-    for (size_t i = 0; i < MAX_DIR_ENTRIES;) {
-      dir_entry[i++].d_inumber = -1;
-    }
-  } break;
-  case T_LINK:
-  case T_FILE:
-    inode->i_size = 0;
-    inode->i_bnumber = -1;
-    break;
-  default:
-    PANIC("inode_create: unknown file type");
+      for (size_t i = 0; i < MAX_DIR_ENTRIES;) {
+        dir_entry[i++].d_inumber = -1;
+      }
+      break;
+    case T_LINK:
+    case T_FILE:
+      inode->i_size = 0;
+      inode->i_bnumber = -1;
+      break;
+    default:
+      PANIC("inode_create: unknown file type");
   }
 
   unlock_inode_table();

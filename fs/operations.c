@@ -59,7 +59,9 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
       return -1;
     }
 
-    if ((inum = inode_create(T_FILE)) < 0) {
+    inum = inode_create(T_FILE);
+
+    if (inum < 0) {
       unlock_inode(ROOT_DIR_INUM);
       return -1;
     }
@@ -75,6 +77,7 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
   unlock_inode(ROOT_DIR_INUM);
 
   inode_t *inode = inode_get(inum);
+
   ALWAYS_ASSERT(inode, "tfs_open: inode deleted mid operation");
 
   if (inode->i_type == T_LINK) {
@@ -132,87 +135,91 @@ int tfs_close(int fhandle) {
 }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
-  wrlock_open_file(fhandle);
-
   open_file_entry_t *file = get_open_file_entry(fhandle);
   if (!file) {
     unlock_open_file(fhandle);
     return -1;
   }
 
-  wrlock_inode(file->of_inumber);
+  int inumber = file->of_inumber;
+  size_t offset = file->of_offset;
 
-  inode_t *inode = inode_get(file->of_inumber);
+  wrlock_inode(inumber);
+
+  inode_t *inode = inode_get(inumber);
+
   ALWAYS_ASSERT(inode, "tfs_write: inode of open file deleted");
 
   // Determine how many bytes to write
   size_t block_size = state_block_size();
-  if ((to_write + file->of_offset) > block_size) {
-    to_write = (block_size - file->of_offset);
+
+  if ((to_write + offset) > block_size) {
+    to_write = (block_size - offset);
   }
 
   if (to_write == 0) {
-    unlock_inode(file->of_inumber);
-    unlock_open_file(fhandle);
+    unlock_inode(inumber);
     return 0;
   }
 
   if (inode->i_size == 0) {
     inode->i_bnumber = data_block_alloc();
+
     if (inode->i_bnumber == -1) {
-      unlock_inode(file->of_inumber);
-      unlock_open_file(fhandle);
+      unlock_inode(inumber);
       return -1; // no space
     }
   }
 
   void *block = data_block_get(inode->i_bnumber);
+
   ALWAYS_ASSERT(block, "tfs_write: data block deleted mid-write");
 
-  memcpy((block + file->of_offset), buffer, to_write);
+  memcpy((block + offset), buffer, to_write);
 
-  file->of_offset += to_write;
-  if (file->of_offset > inode->i_size) {
-    inode->i_size = file->of_offset;
+  if ((offset += to_write) > inode->i_size) {
+    inode->i_size = offset;
   }
 
-  unlock_inode(file->of_inumber);
-  unlock_open_file(fhandle);
+  unlock_inode(inumber);
   return (ssize_t)to_write;
 }
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
-  wrlock_open_file(fhandle);
-
   open_file_entry_t *file = get_open_file_entry(fhandle);
   if (file == NULL) {
     unlock_open_file(fhandle);
     return -1;
   }
 
-  rdlock_inode(file->of_inumber);
+  int inumber = file->of_inumber;
+  size_t offset = file->of_offset;
 
-  inode_t const *inode = inode_get(file->of_inumber);
-  ALWAYS_ASSERT(inode != NULL, "tfs_read: inode of open file deleted");
+  rdlock_inode(inumber);
+
+  inode_t const *inode = inode_get(inumber);
+
+  ALWAYS_ASSERT(inode, "tfs_read: inode of open file deleted");
 
   // Determine how many bytes to read
-  size_t to_read = inode->i_size - file->of_offset;
+  size_t to_read = inode->i_size - offset;
+
   if (to_read > len) {
     to_read = len;
   }
 
   if (to_read > 0) {
     void *block = data_block_get(inode->i_bnumber);
+
     ALWAYS_ASSERT(block != NULL, "tfs_read: data block deleted mid-read");
 
     // Perform the actual read
-    memcpy(buffer, (block + file->of_offset), to_read);
+    memcpy(buffer, (block + offset), to_read);
     // The offset associated with the file handle is incremented accordingly
-    file->of_offset += to_read;
+    offset += to_read;
   }
 
-  unlock_inode(file->of_inumber);
-  unlock_open_file(fhandle);
+  unlock_inode(inumber);
   return (ssize_t)to_read;
 }
 
