@@ -36,7 +36,6 @@ static rwlock_t inode_table_lock;
 static rwlock_t block_table_lock;
 static rwlock_t open_file_table_lock;
 static rwlock_t *inode_locks;
-static rwlock_t *open_file_locks;
 
 // Convenience macros
 #define INODE_TABLE_SIZE (fs_params.max_inode_count)
@@ -120,10 +119,9 @@ int state_init(tfs_params params) {
   free_open_file_entries = malloc(MAX_OPEN_FILES * sizeof(allocation_state_t));
   // locks
   inode_locks = malloc(INODE_TABLE_SIZE * sizeof(rwlock_t));
-  open_file_locks = malloc(MAX_OPEN_FILES * sizeof(rwlock_t));
 
   if (!inode_table || !freeinode_ts || !fs_data || !free_blocks ||
-      !open_file_table || !free_open_file_entries || !inode_locks || !open_file_locks) {
+      !open_file_table || !free_open_file_entries || !inode_locks) {
     return -1; // allocation failed
   }
 
@@ -138,7 +136,6 @@ int state_init(tfs_params params) {
 
   for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
     free_open_file_entries[i] = FREE;
-    rwlock_init(&open_file_locks[i]);
   }
 
   rwlock_init(&inode_table_lock);
@@ -158,12 +155,7 @@ int state_destroy(void) {
     rwlock_destroy(&inode_locks[i]);
   }
 
-  for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
-    rwlock_destroy(&open_file_locks[i]);
-  }
-
   free(inode_locks);
-  free(open_file_locks);
 
   rwlock_destroy(&inode_table_lock);
   rwlock_destroy(&block_table_lock);
@@ -183,7 +175,6 @@ int state_destroy(void) {
   open_file_table = NULL;
   free_open_file_entries = NULL;
   inode_locks = NULL;
-  open_file_locks = NULL;
   return 0;
 }
 
@@ -516,10 +507,8 @@ int add_to_open_file_table(int inumber, size_t offset) {
   for (int i = 0; i < MAX_OPEN_FILES; i++) {
     if (free_open_file_entries[i] == FREE) {
       free_open_file_entries[i] = TAKEN;
-      wrlock_open_file(i);
       open_file_table[i].of_inumber = inumber;
       open_file_table[i].of_offset = offset;
-      unlock_open_file(i);
       unlock_open_file_table();
       return (int)i;
     }
@@ -611,9 +600,3 @@ void wrlock_inode(int inum) { rwlock_wrlock(&inode_locks[inum]); }
 void rdlock_inode(int inum) { rwlock_rdlock(&inode_locks[inum]); }
 
 void unlock_inode(int inum) { rwlock_unlock(&inode_locks[inum]); }
-
-void wrlock_open_file(int fhandle) { rwlock_wrlock(&open_file_locks[fhandle]); }
-
-void rdlock_open_file(int fhandle) { rwlock_rdlock(&open_file_locks[fhandle]); }
-
-void unlock_open_file(int fhandle) { rwlock_unlock(&open_file_locks[fhandle]); }

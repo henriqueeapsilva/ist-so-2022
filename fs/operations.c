@@ -105,11 +105,8 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 }
 
 int tfs_close(int fhandle) {
-  wrlock_open_file(fhandle);
-
   open_file_entry_t *file = get_open_file_entry(fhandle);
   if (!file) {
-    unlock_open_file(fhandle);
     return -1;
   }
 
@@ -118,7 +115,6 @@ int tfs_close(int fhandle) {
   int inum = file->of_inumber;
 
   wrlock_inode(inum);
-  unlock_open_file(fhandle);
 
   inode_t *inode = inode_get(inum);
   if (!inode || (inode->i_links > 0)) {
@@ -137,7 +133,6 @@ int tfs_close(int fhandle) {
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
   open_file_entry_t *file = get_open_file_entry(fhandle);
   if (!file) {
-    unlock_open_file(fhandle);
     return -1;
   }
 
@@ -188,7 +183,6 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
   open_file_entry_t *file = get_open_file_entry(fhandle);
   if (file == NULL) {
-    unlock_open_file(fhandle);
     return -1;
   }
 
