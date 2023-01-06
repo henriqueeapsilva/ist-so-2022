@@ -8,7 +8,7 @@ void fifo_send_msg(int fd, const char *buffer);
 void fifo_make(const char *name, mode_t mode);
 void fifo_unlink(const char *name);
 
-void fifo_open(const char *name, int flags);
+int fifo_open(const char *name, int flags);
 void fifo_close(int fd);
 
 ssize_t fifo_read(int fd, const void *buffer, size_t count);
