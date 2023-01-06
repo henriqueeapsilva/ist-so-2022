@@ -1,4 +1,4 @@
-#include "../utils/logging.h"
+#include "fifo.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -11,13 +11,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-
-int verify_entry(char* mode){
-    if(strcmp(mode, "create") == 0) return 0;
-    if(strcmp(mode, "remove") == 0) return 1;
-    if(strcmp(mode, "list") == 0) return 2;
-    return -1;
-}
+int pipe; // file descriptor for manager pipe
+int reg;  // file descriptor for register pipe
 
 static void print_usage() {
     fprintf(stderr, "usage: \n"
@@ -26,53 +21,53 @@ static void print_usage() {
                     "   manager <register_pipe> <pipe_name> list\n");
 }
 
+static void create_box(int argc, char **argv) {
+
+}
+
+static void remove_box(int argc, char **argv) {
+
+}
+
+static void list() {
+
+}
+
+int verify_entry(char* mode){
+    if(!strcmp(mode, "create")) return 0;
+    if(!strcmp(mode, "remove")) return 1;
+    if(!strcmp(mode, "list")) return 2;
+    return -1;
+}
+
 int main(int argc, char **argv) {
     if(argc < 4) {
         print_usage();
         return(EXIT_FAILURE);
     }
+
     // Create pipe
-    if (mkfifo(argv[2], 0640) != 0) {
-        fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+    fifo_make(argv[2], 0640);
+
+    pipe = fifo_open(argv[2], O_WRONLY);
+    reg = fifo_open(argv[1], O_WRONLY);
+
+    if (!strcmp("create", argv[3])) {
+        create_box(argc, argv);
+    } else if (!strcmp("remove", argv[3])) {
+        remove_box(argc, argv);
+    } else if (!strcmp("list", argv[3])) {
+        list();
+    } else {
+        print_usage();
     }
 
-    int pipe = open(argv[2], O_WRONLY);  // manager pipe
-    if (pipe == -1) {
-        fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+    fifo_close(reg);
+    fifo_close(pipe);
+    fifo_unlink(argv[2]);
 
-    int reg = open(argv[1], O_WRONLY);  // register pipe
-    if (reg == -1) {
-        fprintf(stderr, "[ERR]: open failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    switch (verify_entry(argv[3])) {
-        case 0:
-            
-            break;
-        case 1:
-            break;
-        case 2:
-            break;
-        case -1:
-            print_usage();
-            exit(EXIT_FAILURE);
-    }
-
-    if(close(reg) == -1){
-        fprintf(stderr, "[ERR]: close failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    if(close(pipe) == -1){
-        fprintf(stderr, "[ERR]: close failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(argv[2]) != 0 && errno != ENOENT) {
-        fprintf(stderr, "[ERR]: unlink(%s) failed: %s\n", argv[2], strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    WARN("unimplemented"); // TODO: implement
+    reg = NULL;
+    pipe = NULL;
+    
     return EXIT_SUCCESS;
 }
