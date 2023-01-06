@@ -11,8 +11,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-int pipe; // file descriptor for manager pipe
-int reg;  // file descriptor for register pipe
+static enum resquest_t { CREATE=3, REMOVE=5, LIST=7, UNDEF=-1 };
 
 static void print_usage() {
     fprintf(stderr, "usage: \n"
@@ -21,53 +20,93 @@ static void print_usage() {
                     "   manager <register_pipe> <pipe_name> list\n");
 }
 
-static void create_box(int argc, char **argv) {
+static int eval_request(int argc, char **argv) {
+    if (argc < 4) return UNDEF;
 
-}
+    if (!strcmp(argv[3], "create")) {
+        if (argc < 5) return UNDEF;
 
-static void remove_box(int argc, char **argv) {
+        return CREATE;
+    }
 
-}
+    if (!strcmp(argv[3], "remove")) {
+        if (argc < 5) return UNDEF;
 
-static void list() {
+        return REMOVE;
+    }
 
-}
-
-int verify_entry(char* mode){
-    if(!strcmp(mode, "create")) return 0;
-    if(!strcmp(mode, "remove")) return 1;
-    if(!strcmp(mode, "list")) return 2;
-    return -1;
+    return strcmp(argv[3], "list") ? UNDEF : LIST;
 }
 
 int main(int argc, char **argv) {
-    if(argc < 4) {
+    int request = eval_request(argc, argv);
+
+    if(request == UNDEF) {
         print_usage();
-        return(EXIT_FAILURE);
+        return EXIT_SUCCESS;
     }
 
     // Create pipe
     fifo_make(argv[2], 0640);
 
-    pipe = fifo_open(argv[2], O_WRONLY);
-    reg = fifo_open(argv[1], O_WRONLY);
+    int fregister = fifo_open(argv[1], O_WRONLY);
+    int fsession = fifo_open(argv[2], O_WRONLY);
 
-    if (!strcmp("create", argv[3])) {
-        create_box(argc, argv);
-    } else if (!strcmp("remove", argv[3])) {
-        remove_box(argc, argv);
-    } else if (!strcmp("list", argv[3])) {
-        list();
-    } else {
-        print_usage();
+    switch (request) {
+        case CREATE:
+            /*
+             * Create request:
+             * [ code = 3 (uint8_t) ] | [ session_pipe_name (char[256]) ] | [ box_name (char[32]) ]
+             */
+
+            char msg[1+256+32];
+
+            sprintf(msg, "%d", request);     // insert request code
+            strncpy(msg+1, argv[2], 256);    // insert session pipe name
+            strncpy(msg+1+256, argv[4], 32); // insert box name
+
+            fifo_send_msg(fregister, msg);
+
+            break;
+        case REMOVE:
+            /*
+             * Remove request:
+             * [ code = 5 (uint8_t) ] | [ session_pipe_name (char[256]) ] | [ box_name (char[32]) ]
+             */
+
+            char msg[1+256+32];
+
+            sprintf(msg, "%d", request);     // insert request code
+            strncpy(msg+1, argv[2], 256);    // insert session pipe name
+            strncpy(msg+1+256, argv[4], 32); // insert box name
+
+            fifo_send_msg(fregister, msg);
+            
+            break;
+        case LIST:
+            /*
+             * List request:
+             * [ code = 7 (uint8_t) ] | [ session_pipe_name (char[256]) ]
+             */
+
+            char msg[1+256];
+
+            sprintf(msg, "%d", request);     // insert request code
+            strncpy(msg+1, argv[2], 256); // insert session pipe name
+
+            fifo_send_msg(fregister, msg);
+
+            break;
+        default:
+            // should not happen
     }
 
-    fifo_close(reg);
-    fifo_close(pipe);
+    fifo_close(fregister);
+    fifo_close(fsession);
     fifo_unlink(argv[2]);
 
-    reg = NULL;
-    pipe = NULL;
+    fregister = NULL;
+    fsession = NULL;
     
     return EXIT_SUCCESS;
 }
