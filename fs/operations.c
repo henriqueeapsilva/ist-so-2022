@@ -1,7 +1,7 @@
 #include "operations.h"
 #include "config.h"
 #include "state.h"
-#include "thread.h"
+#include "../utils/thread.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

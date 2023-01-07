@@ -2,17 +2,10 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
-
-// Helper function to send messages
-// Retries to send whatever was not sent in the beginning
-void fifo_send_msg(int fd, char const *str) {
-    size_t len = strlen(str);
-    size_t written = 0;
-
-    while (written < len) {
-        written += fifo_write(fd, str + written, len - written);
-    }
-}
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 void fifo_make(char *name, mode_t mode) {
     if (mkfifo(name, mode) == -1) {
@@ -23,12 +16,12 @@ void fifo_make(char *name, mode_t mode) {
 
 int fifo_open(char *name, int flags) {
     int fhandler = open(name, flags);
-    
+
     if (fhandler == -1) {
         fprintf(stderr, "Could not open fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    
+
     return fhandler;
 }
 
@@ -39,8 +32,18 @@ ssize_t fifo_write(int fd, const void *buffer, size_t count) {
         fprintf(stderr, "Could not write to fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    
+
     return ret;
+}
+// Helper function to send messages
+// Retries to send whatever was not sent in the beginning
+void fifo_send_msg(int fd, char const *str) {
+    size_t len = strlen(str);
+    size_t written = 0;
+
+    while (written < len) {
+        written += fifo_write(fd, str + written, len - written);
+    }
 }
 
 ssize_t fifo_read(int fd, const void *buffer, size_t count) {

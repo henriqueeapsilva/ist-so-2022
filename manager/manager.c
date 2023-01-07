@@ -1,15 +1,9 @@
-#include "fifo.h"
-#include <assert.h>
-#include <errno.h>
+#include "../utils/fifo.h"
 #include <fcntl.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
+
 
 static enum resquest_t { CREATE=3, REMOVE=5, LIST=7, UNDEF=-1 };
 
@@ -52,14 +46,14 @@ int main(int argc, char **argv) {
     int fregister = fifo_open(argv[1], O_WRONLY);
     int fsession = fifo_open(argv[2], O_WRONLY);
 
+    char msg[1+256+32];
+
     switch (request) {
         case CREATE:
             /*
              * Create request:
              * [ code = 3 (uint8_t) ] | [ session_pipe_name (char[256]) ] | [ box_name (char[32]) ]
              */
-
-            char msg[1+256+32];
 
             sprintf(msg, "%d", request);     // insert request code
             strncpy(msg+1, argv[2], 256);    // insert session pipe name
@@ -74,8 +68,6 @@ int main(int argc, char **argv) {
              * [ code = 5 (uint8_t) ] | [ session_pipe_name (char[256]) ] | [ box_name (char[32]) ]
              */
 
-            char msg[1+256+32];
-
             sprintf(msg, "%d", request);     // insert request code
             strncpy(msg+1, argv[2], 256);    // insert session pipe name
             strncpy(msg+1+256, argv[4], 32); // insert box name
@@ -89,24 +81,18 @@ int main(int argc, char **argv) {
              * [ code = 7 (uint8_t) ] | [ session_pipe_name (char[256]) ]
              */
 
-            char msg[1+256];
-
             sprintf(msg, "%d", request);     // insert request code
             strncpy(msg+1, argv[2], 256); // insert session pipe name
 
             fifo_send_msg(fregister, msg);
 
             break;
-        default:
-            // should not happen
     }
 
     fifo_close(fregister);
     fifo_close(fsession);
     fifo_unlink(argv[2]);
 
-    fregister = NULL;
-    fsession = NULL;
-    
+
     return EXIT_SUCCESS;
 }
