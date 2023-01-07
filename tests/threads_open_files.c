@@ -1,5 +1,5 @@
 #include "fs/operations.h"
-#include "fs/thread.h"
+#include "utils/thread.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
