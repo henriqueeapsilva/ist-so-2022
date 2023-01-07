@@ -60,17 +60,11 @@ ssize_t read_from_channel(int fd, const void *buffer, size_t len) {
     return ret;
 }
 
-/* Helpers */
-
-/**
- * Force write to the channel.
- * Retries to send whatever was not sent in the beginning.
-*/
 void fwrite_to_channel(int fd, const void *buffer, size_t len) {
     size_t written = 0;
 
     while (written < len) {
-        written += write_to_channel(fd, buffer + written, len - written);
+        written += write_to_channel(fd, (buffer + written), (len - written));
     }
 }
 
@@ -81,5 +75,6 @@ void memwrite_to_channel(int fd, void *ptr) {
 void strwrite_to_channel(int fd, char *string, size_t len) {
     char buffer[len];
     strncpy(buffer, string, len);
+    buffer[len-1] = '\0';
     fwrite_to_channel(fd, buffer, len);
 }

@@ -1,9 +1,9 @@
-#include "../utils/fifo.h"
+#include "utils/channel.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <stdint.h>
 
 static enum resquest_t { CREATE=3, REMOVE=5, LIST=7, UNDEF=-1 };
 
@@ -14,7 +14,7 @@ static void print_usage() {
                     "   manager <register_pipe> <pipe_name> list\n");
 }
 
-static int eval_request(int argc, char **argv) {
+static uint8_t eval_request(int argc, char **argv) {
     if (argc < 4) return UNDEF;
 
     if (!strcmp(argv[3], "create")) {
@@ -33,66 +33,116 @@ static int eval_request(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-    int request = eval_request(argc, argv);
+    uint8_t code = eval_request(argc, argv);
 
-    if(request == UNDEF) {
+    if(code == UNDEF) {
         print_usage();
         return EXIT_SUCCESS;
     }
 
-    // Create pipe
-    fifo_make(argv[2], 0640);
+    create_channel(argv[2], 0640);
 
-    int fregister = fifo_open(argv[1], O_WRONLY);
-    int fsession = fifo_open(argv[2], O_WRONLY);
+    int fregister = open_channel(argv[1], O_WRONLY);
+    int fsession = open_channel(argv[2], O_WRONLY);
 
-    char msg[1+256+32];
-
-    switch (request) {
+    switch (code) {
         case CREATE:
-            /*
-             * Create request:
-             * [ code = 3 (uint8_t) ] | [ session_pipe_name (char[256]) ] | [ box_name (char[32]) ]
-             */
+            // send create request
 
-            sprintf(msg, "%d", request);     // insert request code
-            strncpy(msg+1, argv[2], 256);    // insert session pipe name
-            strncpy(msg+1+256, argv[4], 32); // insert box name
+            memwrite_to_channel(fregister, &code);
+            strwrite_to_channel(fregister, argv[2], 256);
+            strwrite_to_channel(fregister, argv[4], 32);
 
-            fifo_send_msg(fregister, msg);
+            // receive response
+
+            read_from_channel(fsession, &code, sizeof(uint8_t));
+            assert(code == 4);
+
+            int32_t failed;
+
+            read_from_channel(fsession, &failed, sizeof(int32_t));
+
+            if (failed) {
+                char error_message[1024];
+                read_from_channel(fsession, error_message, sizeof(error_message));
+                fprintf(stdout, "ERROR %s\n", error_message);
+            } else {
+                fprintf(stdout, "OK\n");
+            }
 
             break;
         case REMOVE:
-            /*
-             * Remove request:
-             * [ code = 5 (uint8_t) ] | [ session_pipe_name (char[256]) ] | [ box_name (char[32]) ]
-             */
+            // send remvove request
 
-            sprintf(msg, "%d", request);     // insert request code
-            strncpy(msg+1, argv[2], 256);    // insert session pipe name
-            strncpy(msg+1+256, argv[4], 32); // insert box name
+            memwrite_to_channel(fregister, &code);
+            strwrite_to_channel(fregister, argv[2], 256);
+            strwrite_to_channel(fregister, argv[4], 32);
 
-            fifo_send_msg(fregister, msg);
-            
+            // receive response
+
+            read_from_channel(fsession, &code, sizeof(uint8_t));
+            assert(code == 6);
+
+            int32_t failed;
+
+            read_from_channel(fsession, &failed, sizeof(int32_t));
+
+            if (failed) {
+                char error_message[1024];
+                read_from_channel(fsession, error_message, sizeof(error_message));
+                fprintf(stdout, "ERROR %s\n", error_message);
+            } else {
+                fprintf(stdout, "OK\n");
+            }
+
             break;
         case LIST:
-            /*
-             * List request:
-             * [ code = 7 (uint8_t) ] | [ session_pipe_name (char[256]) ]
-             */
+            // send list request
 
-            sprintf(msg, "%d", request);     // insert request code
-            strncpy(msg+1, argv[2], 256); // insert session pipe name
+            memwrite_to_channel(fregister, &code);
+            strwrite_to_channel(fregister, argv[2], 256);
 
-            fifo_send_msg(fregister, msg);
+            // receive response
+
+            read_from_channel(fsession, &code, sizeof(uint8_t));
+
+            assert(code == 8);
+
+            int32_t last;
+            char box_name[32];
+
+            read_from_channel(fsession, &last, sizeof(uint8_t));
+            read_from_channel(fsession, &box_name, sizeof(box_name));
+
+            if (last && (box_name[0] == '\0')) {
+                fprintf(stdout, "NO BOXES FOUND\n");
+            } else {
+                while (1) {
+                    // TODO: sort boxes alphabetically
+
+                    uint64_t box_size;
+                    uint64_t n_publishers;
+                    uint64_t n_subscribers;
+
+                    read_from_channel(fsession, &box_size, sizeof(box_size));
+                    read_from_channel(fsession, &n_publishers, sizeof(n_publishers));
+                    read_from_channel(fsession, &n_subscribers, sizeof(n_subscribers));
+
+                    fprintf(stdout, "%s %zu %zu %zu\n", box_name, box_size, n_publishers, n_subscribers);
+
+                    if (last) break;
+
+                    read_from_channel(fsession, &last, sizeof(uint8_t));
+                    read_from_channel(fsession, &box_name, sizeof(box_name));
+                }
+            }
 
             break;
     }
 
-    fifo_close(fregister);
-    fifo_close(fsession);
-    fifo_unlink(argv[2]);
-
+    close_channel(fregister);
+    close_channel(fsession);
+    delete_channel(argv[2]);
 
     return EXIT_SUCCESS;
 }
