@@ -38,12 +38,12 @@ int main(int argc, char **argv) {
         int fsession = open_channel(argv[2], O_WRONLY);
 
         char msg[LENGTH];
-        char c = getchar();
+        int c = getchar();
         int i = 0;
 
         while (c != EOF) {
             if (c == '\n') {
-                memset(msg + i, '\0', LENGTH - i);
+                memset(msg + i, '\0', (size_t) (LENGTH - i));
                 memwrite_to_channel(fsession, msg);
             } else if ((i == LENGTH - 1)) {
                 do {
