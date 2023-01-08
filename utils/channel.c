@@ -6,6 +6,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/unistd.h>
+#include <stdint.h>
+#include <stdarg.h>
+
 /* Channel Handler */
 
 void create_channel(const char *name, mode_t mode) {
@@ -77,7 +80,7 @@ void memwrite_to_channel(int fd, void *ptr) {
 
 void strwrite_to_channel(int fd, char *string, size_t len) {
     char buffer[len];
-    strncpy(buffer, string, len);
+    strncpy(buffer, string, len - 1);
     buffer[len - 1] = '\0';
     fwrite_to_channel(fd, buffer, len);
 }
