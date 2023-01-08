@@ -5,8 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-static enum resquest_t { CREATE = 3, REMOVE = 5, LIST = 7, UNDEF = -1 };
+#include <assert.h>
 
 static void print_usage() {
     fprintf(stderr,
@@ -17,9 +16,9 @@ static void print_usage() {
 }
 
 bool eval_request(int argc, char **argv);
-void create_box(int argc, char **argv);
-void remove_box(int argc, char **argv);
-void list(int argc, char **argv);
+void create_box(char *reg_pipe_path, char *pipe_path, char *box_name);
+void remove_box(char *reg_pipe_path, char *pipe_path, char *box_name);
+void list(char *reg_pipe_path, char *pipe_path);
 
 int main(int argc, char **argv) {
     if (!eval_request(argc, argv)) {
@@ -37,7 +36,7 @@ bool eval_request(int argc, char **argv) {
         if (argc < 5)
             return false;
 
-        create_box(argc, argv);
+        create_box(argv[1], argv[2], argv[4]);
         return true;
     }
 
@@ -45,29 +44,31 @@ bool eval_request(int argc, char **argv) {
         if (argc < 5)
             return false;
 
-        remove_box(argc, argv);
+        remove_box(argv[1], argv[2], argv[4]);
         return true;
     }
 
     if (!strcmp(argv[3], "list")) {
-        list(argc, argv);
+        list(argv[1], argv[2]);
         return true;
     }
+
+    return false;
 }
 
-void update_box(int argc, char **argv, uint8_t request) {
+void update_box(uint8_t request, char *reg_pipe_path, char *pipe_path, char *box_name) {
     // create channel
 
-    create_channel(argv[2], 0640);
+    create_channel(pipe_path, 0640);
 
     // send request
 
     {
-        int fregistry = open_channel(argv[1], O_WRONLY);
+        int fregistry = open_channel(reg_pipe_path, O_WRONLY);
 
         memwrite_to_channel(fregistry, (uint8_t *)&request);
-        strwrite_to_channel(fregistry, argv[2], 256);
-        strwrite_to_channel(fregistry, argv[4], 32);
+        strwrite_to_channel(fregistry, pipe_path, 256);
+        strwrite_to_channel(fregistry, box_name, 32);
 
         close_channel(fregistry);
     }
@@ -75,7 +76,7 @@ void update_box(int argc, char **argv, uint8_t request) {
     // receive response
 
     {
-        int fsession = open_channel(argv[2], O_WRONLY);
+        int fsession = open_channel(pipe_path, O_WRONLY);
 
         uint8_t code;
         read_from_channel(fsession, &code, sizeof(code));
@@ -97,26 +98,30 @@ void update_box(int argc, char **argv, uint8_t request) {
 
     // delete channel
 
-    delete_channel(argv[2]);
+    delete_channel(pipe_path);
 }
 
-void create_box(int argc, char **argv) { update_box(argc, argv, 3); }
+void create_box(char *reg_pipe_path, char *pipe_path, char *box_name) {
+    update_box(3, reg_pipe_path, pipe_path, box_name);
+}
 
-void remove_box(int argc, char **argv) { update_box(argc, argv, 5); }
+void remove_box(char *reg_pipe_path, char *pipe_path, char *box_name) {
+    update_box(5, reg_pipe_path, pipe_path, box_name);
+}
 
-void list(int argc, char **argv) {
+void list(char *reg_pipe_path, char *pipe_path) {
     // create channel
 
-    create_channel(argv[2], 0640);
+    create_channel(pipe_path, 0640);
 
     // send request
 
     {
-        int fregistry = open_channel(argv[1], O_WRONLY);
+        int fregistry = open_channel(reg_pipe_path, O_WRONLY);
 
         uint8_t request = 7;
         memwrite_to_channel(fregistry, (uint8_t *)&request);
-        strwrite_to_channel(fregistry, argv[2], 256);
+        strwrite_to_channel(fregistry, pipe_path, 256);
 
         close_channel(fregistry);
     }
@@ -124,7 +129,7 @@ void list(int argc, char **argv) {
     // receive response
 
     {
-        int fsession = open_channel(argv[2], O_WRONLY);
+        int fsession = open_channel(pipe_path, O_WRONLY);
 
         uint8_t code;
         read_from_channel(fsession, &code, sizeof(code));
@@ -164,5 +169,5 @@ void list(int argc, char **argv) {
     }
 
     // delete channel
-    delete_channel(argv[2]);
+    delete_channel(pipe_path);
 }
