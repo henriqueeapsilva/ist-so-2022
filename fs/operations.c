@@ -1,9 +1,7 @@
 #include "operations.h"
 #include "config.h"
 #include "state.h"
-#include "utils/betterassert.h"
-#include "utils/thread.h"
-
+#include "../utils/betterassert.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
