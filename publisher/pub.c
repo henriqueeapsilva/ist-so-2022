@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
             if (c == '\n') {
                 memset(msg + i, '\0', (size_t) (LENGTH - i));
                 memwrite_to_channel(fsession, msg);
-            } else if ((i == LENGTH - 1)) {
+            } else if (i == LENGTH - 1) {
                 do {
                     c = getchar();
                 } while ((c != EOF) && (c != '\n'));
