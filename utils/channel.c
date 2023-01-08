@@ -1,8 +1,8 @@
 #include "channel.h"
-#include <fcntl.h>
-#include <stdio.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /* Channel Handler */
 
@@ -15,19 +15,20 @@ void create_channel(const char *name, mode_t mode) {
 
 void delete_channel(const char *name) {
     if ((unlink(name) != 0) && (errno != ENOENT)) {
-        fprintf(stderr, "Could not unlink fifo (%s): %s\n", name, strerror(errno));
+        fprintf(stderr, "Could not unlink fifo (%s): %s\n", name,
+                strerror(errno));
         exit(EXIT_FAILURE);
     }
 }
 
 int open_channel(char *name, int flags) {
     int fd = open(name, flags);
-    
+
     if (fd == -1) {
         fprintf(stderr, "Could not open fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    
+
     return fd;
 }
 
@@ -45,7 +46,7 @@ ssize_t write_to_channel(int fd, const void *buffer, size_t len) {
         fprintf(stderr, "Could not write to fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    
+
     return ret;
 }
 
@@ -56,7 +57,7 @@ ssize_t read_from_channel(int fd, const void *buffer, size_t len) {
         fprintf(stderr, "Could not read from fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-    
+
     return ret;
 }
 
@@ -75,6 +76,6 @@ void memwrite_to_channel(int fd, void *ptr) {
 void strwrite_to_channel(int fd, char *string, size_t len) {
     char buffer[len];
     strncpy(buffer, string, len);
-    buffer[len-1] = '\0';
+    buffer[len - 1] = '\0';
     fwrite_to_channel(fd, buffer, len);
 }

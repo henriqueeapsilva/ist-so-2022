@@ -5,35 +5,35 @@
 
 int main() {
 
-  char *str_ext_file =
-      "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
-      "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
-      "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
-      "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
-      "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
-      "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
-      "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
-      "BBB! BBB! BBB! BBB! BBB! ";
-  char *tfs_path = "/f1";
-  char *ext_path = "tests/file_large.txt";
-  char buffer[600];
+    char *str_ext_file =
+        "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
+        "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
+        "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
+        "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
+        "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
+        "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
+        "BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! BBB! "
+        "BBB! BBB! BBB! BBB! BBB! ";
+    char *tfs_path = "/f1";
+    char *ext_path = "tests/file_large.txt";
+    char buffer[600];
 
-  assert(tfs_init(NULL) != -1);
+    assert(tfs_init(NULL) != -1);
 
-  int f;
-  ssize_t r;
+    int f;
+    ssize_t r;
 
-  f = tfs_copy_from_external_fs(ext_path, tfs_path);
-  assert(f != -1);
+    f = tfs_copy_from_external_fs(ext_path, tfs_path);
+    assert(f != -1);
 
-  f = tfs_open(tfs_path, TFS_O_CREAT);
-  assert(f != -1);
+    f = tfs_open(tfs_path, TFS_O_CREAT);
+    assert(f != -1);
 
-  r = tfs_read(f, buffer, sizeof(buffer) - 1);
-  assert(r == strlen(str_ext_file));
-  assert(!memcmp(buffer, str_ext_file, strlen(str_ext_file)));
+    r = tfs_read(f, buffer, sizeof(buffer) - 1);
+    assert(r == strlen(str_ext_file));
+    assert(!memcmp(buffer, str_ext_file, strlen(str_ext_file)));
 
-  printf("Successful test.\n");
+    printf("Successful test.\n");
 
-  return 0;
+    return 0;
 }
