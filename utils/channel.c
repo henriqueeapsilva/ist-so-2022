@@ -41,7 +41,7 @@ void close_channel(int fd) {
     }
 }
 
-ssize_t write_to_channel(int fd, const void *buffer, size_t len) {
+size_t write_to_channel(int fd, const void *buffer, size_t len) {
     ssize_t ret = write(fd, buffer, len);
 
     if (ret < 0) {
@@ -49,10 +49,10 @@ ssize_t write_to_channel(int fd, const void *buffer, size_t len) {
         exit(EXIT_FAILURE);
     }
 
-    return ret;
+    return (size_t) ret;
 }
 
-ssize_t read_from_channel(int fd, const void *buffer, size_t len) {
+size_t read_from_channel(int fd, void *buffer, size_t len) {
     ssize_t ret = read(fd, buffer, len);
 
     if (ret < 0) {
@@ -60,7 +60,7 @@ ssize_t read_from_channel(int fd, const void *buffer, size_t len) {
         exit(EXIT_FAILURE);
     }
 
-    return ret;
+    return (size_t) ret;
 }
 
 void fwrite_to_channel(int fd, const void *buffer, size_t len) {
