@@ -1,6 +1,5 @@
 #include "../utils/channel.h"
 #include <fcntl.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +14,7 @@ static void print_usage() {
             "   manager <register_pipe_name> <pipe_name> list\n");
 }
 
-bool eval_request(int argc, char **argv);
+int eval_request(int argc, char **argv);
 void create_box(char *reg_pipe_path, char *pipe_path, char *box_name);
 void remove_box(char *reg_pipe_path, char *pipe_path, char *box_name);
 void list(char *reg_pipe_path, char *pipe_path);
@@ -28,32 +27,32 @@ int main(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
-bool eval_request(int argc, char **argv) {
+int eval_request(int argc, char **argv) {
     if (argc < 4)
-        return false;
+        return 0;
 
     if (!strcmp(argv[3], "create")) {
         if (argc < 5)
-            return false;
+            return 0;
 
         create_box(argv[1], argv[2], argv[4]);
-        return true;
+        return 1;
     }
 
     if (!strcmp(argv[3], "remove")) {
         if (argc < 5)
-            return false;
+            return 0;
 
         remove_box(argv[1], argv[2], argv[4]);
-        return true;
+        return 1;
     }
 
     if (!strcmp(argv[3], "list")) {
         list(argv[1], argv[2]);
-        return true;
+        return 1;
     }
 
-    return false;
+    return 0;
 }
 
 void update_box(uint8_t request, char *reg_pipe_path, char *pipe_path, char *box_name) {
