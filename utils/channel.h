@@ -20,6 +20,12 @@ size_t read_from_channel(int fd, void *buffer, size_t len);
 void fwrite_to_channel(int fd, const void *buffer, size_t len);
 
 /**
+ * Force read from the channel.
+ * Retries to receive whatever was not received in the beginning.
+ */
+void fread_from_channel(int fd, void *buffer, size_t len);
+
+/**
  * Writes a piece of data to the channel.
  */
 void memwrite_to_channel(int fd, void *ptr);

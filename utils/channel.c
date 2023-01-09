@@ -19,9 +19,8 @@ void create_channel(const char *name, mode_t mode) {
 }
 
 void delete_channel(const char *name) {
-    if ((unlink(name) != 0) && (errno != ENOENT)) {
-        fprintf(stderr, "Could not unlink fifo (%s): %s\n", name,
-                strerror(errno));
+    if ((unlink(name) == -1) && (errno != ENOENT)) {
+        fprintf(stderr, "Could not unlink fifo (%s): %s\n", name, strerror(errno));
         exit(EXIT_FAILURE);
     }
 }
@@ -45,9 +44,11 @@ void close_channel(int fd) {
 }
 
 size_t write_to_channel(int fd, const void *buffer, size_t len) {
-    ssize_t ret = write(fd, buffer, len);
+    ssize_t ret;
 
-    if (ret < 0) {
+    while ((ret = write(fd, buffer, len) == -1) && (errno == EINTR));
+
+    if (ret == -1) {
         fprintf(stderr, "Could not write to fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -56,9 +57,11 @@ size_t write_to_channel(int fd, const void *buffer, size_t len) {
 }
 
 size_t read_from_channel(int fd, void *buffer, size_t len) {
-    ssize_t ret = read(fd, buffer, len);
+    ssize_t ret;
 
-    if (ret < 0) {
+    while ((ret = read(fd, buffer, len) == -1) && (errno == EINTR));
+
+    if (ret == -1) {
         fprintf(stderr, "Could not read from fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -71,6 +74,14 @@ void fwrite_to_channel(int fd, const void *buffer, size_t len) {
 
     while (written < len) {
         written += write_to_channel(fd, (buffer + written), (len - written));
+    }
+}
+
+void fread_from_channel(int fd, void *buffer, size_t len) {
+    size_t read = 0;
+
+    while (read < len) {
+        read += read_from_channel(fd, (buffer + read), (len - read));
     }
 }
 
