@@ -40,22 +40,26 @@ int main(int argc, char **argv) {
         char msg[LENGTH];
         int i = 0;
 
-        msg[i] = getchar();
-
-        while (msg[i] != EOF) {
+        while ((msg[i++] = getchar()) != EOF) {
             if (msg[i] == '\n') {
-                memset(msg + i, '\0', (size_t) (LENGTH - i));
+                memset(msg+i, '\0', LENGTH-i);
                 memwrite_to_channel(fsession, msg);
-                i = 0;
-            } else if (i == (LENGTH - 1)) {
-                do {
-                    msg[i] = getchar();
-                } while ((msg[i] != EOF) && (msg[i] != '\n'));
                 i = 0;
                 continue;
             }
 
-            msg[i++] = getchar();
+            if (i == (LENGTH-1)) {
+                do {
+                    msg[i] = getchar();
+                } while ((msg[i] != EOF) && (msg[i] != '\n'));
+
+                if (msg[i] == EOF) break;
+
+                msg[i] = '\0';
+                memwrite_to_channel(fsession, msg);
+                i = 0;
+                continue;
+            }
         }
 
         close_channel(fsession);
