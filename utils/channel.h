@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <sys/types.h>
+#include <stdint.h>
 
 void create_channel(const char *name, mode_t mode);
 void delete_channel(const char *name);
@@ -34,5 +35,7 @@ void memwrite_to_channel(int fd, void *ptr);
  * Writes a string to the channel, filling the end with '\0'.
  */
 void strwrite_to_channel(int fd, char *string, size_t len);
+
+void send_protocol_message(int fd, uint8_t code, ...);
 
 #endif
