@@ -38,22 +38,24 @@ int main(int argc, char **argv) {
         int fsession = open_channel(argv[2], O_WRONLY);
 
         char msg[LENGTH];
-        int c = getchar();
         int i = 0;
 
-        while (c != EOF) {
-            if (c == '\n') {
+        msg[i] = getchar();
+
+        while (msg[i] != EOF) {
+            if (msg[i] == '\n') {
                 memset(msg + i, '\0', (size_t) (LENGTH - i));
                 memwrite_to_channel(fsession, msg);
-            } else if (i == LENGTH - 1) {
+                i = 0;
+            } else if (i == (LENGTH - 1)) {
                 do {
-                    c = getchar();
-                } while ((c != EOF) && (c != '\n'));
+                    msg[i] = getchar();
+                } while ((msg[i] != EOF) && (msg[i] != '\n'));
+                i = 0;
                 continue;
             }
 
-            c = getchar();
-            i++;
+            msg[i++] = getchar();
         }
 
         close_channel(fsession);
