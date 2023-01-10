@@ -98,9 +98,8 @@ static void memwrite_to_channel(int fd, void *ptr) {
  */
 static void strwrite_to_channel(int fd, char *string, size_t len) {
     char buffer[len];
-    strncpy(buffer, string, len - 1);
     buffer[len - 1] = '\0';
-    fwrite_to_channel(fd, buffer, len);
+    fwrite_to_channel(fd, strncpy(buffer, string, len - 1), len);
 }
 
 static void vsend_message(int fd, uint8_t code, va_list ap) {
