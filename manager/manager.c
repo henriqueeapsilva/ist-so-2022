@@ -15,8 +15,7 @@ static void print_usage() {
 }
 
 int eval_request(int argc, char **argv);
-void create_box(char *reg_pipe_path, char *pipe_path, char *box_name);
-void remove_box(char *reg_pipe_path, char *pipe_path, char *box_name);
+void update_box(uint8_t code, char *reg_pipe_path, char *pipe_path, char *box_name);
 void list(char *reg_pipe_path, char *pipe_path);
 
 int main(int argc, char **argv) {
@@ -35,7 +34,7 @@ int eval_request(int argc, char **argv) {
         if (argc < 5)
             return 0;
 
-        create_box(argv[1], argv[2], argv[4]);
+        update_box(3, argv[1], argv[2], argv[4]);
         return 1;
     }
 
@@ -43,7 +42,7 @@ int eval_request(int argc, char **argv) {
         if (argc < 5)
             return 0;
 
-        remove_box(argv[1], argv[2], argv[4]);
+        update_box(5, argv[1], argv[2], argv[4]);
         return 1;
     }
 
@@ -55,57 +54,36 @@ int eval_request(int argc, char **argv) {
     return 0;
 }
 
-void update_box(uint8_t request, char *reg_pipe_path, char *pipe_path, char *box_name) {
+void update_box(uint8_t code, char *reg_pipe_path, char *pipe_path, char *box_name) {
     // create channel
 
     create_channel(pipe_path, 0640);
 
     // send request
 
-    {
-        int fregistry = open_channel(reg_pipe_path, O_WRONLY);
-
-        memwrite_to_channel(fregistry, (uint8_t *)&request);
-        strwrite_to_channel(fregistry, pipe_path, 256);
-        strwrite_to_channel(fregistry, box_name, 32);
-
-        close_channel(fregistry);
-    }
+    send_quick_message(reg_pipe_path, code, pipe_path, box_name);
 
     // receive response
 
-    {
-        int fsession = open_channel(pipe_path, O_WRONLY);
+    int fd = open_channel(pipe_path, O_RDONLY);
 
-        uint8_t code;
-        read_from_channel(fsession, &code, sizeof(code));
-        assert(code == (request + 1));
+    int32_t error_code;
+    char error_message[1024];
 
-        int32_t failed;
-        char message[1024];
-        read_from_channel(fsession, &failed, sizeof(failed));
-        read_from_channel(fsession, message, sizeof(message));
+    assert(receive_code(fd) == ++code);
+    receive_content(fd, code, &error_code, error_message);
 
-        if (failed) {
-            fprintf(stdout, "ERROR %s\n", message);
-        } else {
-            fprintf(stdout, "OK\n");
-        }
-
-        close_channel(fsession);
+    if (error_code) {
+        fprintf(stdout, "ERROR %s\n", error_message);
+    } else {
+        fprintf(stdout, "OK\n");
     }
+
+    close_channel(fd);
 
     // delete channel
 
     delete_channel(pipe_path);
-}
-
-void create_box(char *reg_pipe_path, char *pipe_path, char *box_name) {
-    update_box(3, reg_pipe_path, pipe_path, box_name);
-}
-
-void remove_box(char *reg_pipe_path, char *pipe_path, char *box_name) {
-    update_box(5, reg_pipe_path, pipe_path, box_name);
 }
 
 void list(char *reg_pipe_path, char *pipe_path) {
@@ -115,58 +93,34 @@ void list(char *reg_pipe_path, char *pipe_path) {
 
     // send request
 
-    {
-        int fregistry = open_channel(reg_pipe_path, O_WRONLY);
-
-        uint8_t request = 7;
-        memwrite_to_channel(fregistry, (uint8_t *)&request);
-        strwrite_to_channel(fregistry, pipe_path, 256);
-
-        close_channel(fregistry);
-    }
+    send_quick_message(reg_pipe_path, 7, pipe_path);
 
     // receive response
 
-    {
-        int fsession = open_channel(pipe_path, O_WRONLY);
+    int fd = open_channel(pipe_path, O_RDONLY);
 
-        uint8_t code;
-        read_from_channel(fsession, &code, sizeof(code));
-        assert(code == 8);
+    uint8_t code = 7;
+    uint8_t last;
+    char box_name[32];
+    uint64_t box_size;
+    uint64_t n_publishers;
+    uint64_t n_subscribers;
 
-        uint8_t last;
-        char box_name[32];
+    assert(receive_code(fd) == code);
+    receive_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
 
-        read_from_channel(fsession, &last, sizeof(last));
-        read_from_channel(fsession, box_name, sizeof(box_name));
-
-        if (box_name[0] == '\0') {
-            fprintf(stdout, "NO BOXES FOUND\n");
-        } else {
-            uint64_t box_size;
-            uint64_t n_publishers;
-            uint64_t n_subscribers;
-
-            while (1) {
-                read_from_channel(fsession, &box_size, sizeof(box_size));
-                read_from_channel(fsession, &n_publishers,
-                                  sizeof(n_publishers));
-                read_from_channel(fsession, &n_subscribers,
-                                  sizeof(n_subscribers));
-
-                // store box info somewhere, sort alphabetically and print
-
-                if (last)
-                    break;
-
-                read_from_channel(fsession, &last, sizeof(last));
-                read_from_channel(fsession, box_name, sizeof(box_name));
-            }
+    if (!*box_name) {
+        fprintf(stdout, "NO BOXES FOUND\n");
+    } else {
+        while (!last) {
+            assert(receive_code(fd) == code);
+            receive_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
         }
-
-        close_channel(fsession);
     }
 
+    close_channel(fd);
+
     // delete channel
+
     delete_channel(pipe_path);
 }
