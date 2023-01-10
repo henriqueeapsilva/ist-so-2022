@@ -8,6 +8,30 @@
 
 #define LENGTH 1024 // the length of a message
 
+int scan_message(char *msg) {
+    int i = 0;
+    
+    while ((msg[i++] = (char) getchar()) != EOF) {
+        if (msg[i] == '\n') {
+            memset(msg+i, '\0', (size_t) (LENGTH-i));
+            return 1;
+        }
+
+        if (i == (LENGTH-1)) {
+            do {
+                msg[i] = (char) getchar();
+            } while ((msg[i] != EOF) && (msg[i] != '\n'));
+
+            if (msg[i] == EOF) return 0;
+
+            msg[i] = '\0';
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc < 4) {
         fprintf(stderr,
@@ -21,49 +45,19 @@ int main(int argc, char **argv) {
 
     // send request
 
-    {
-        int fregister = open_channel(argv[1], O_WRONLY);
-
-        uint8_t code = 1;
-        memwrite_to_channel(fregister, &code);
-        strwrite_to_channel(fregister, argv[2], 256);
-        strwrite_to_channel(fregister, argv[3], 32);
-
-        close_channel(fregister);
-    }
+    send_quick_message(argv[1], 1, argv[2], argv[3]);
 
     // publish messages
 
-    {
-        int fsession = open_channel(argv[2], O_WRONLY);
+    int fd = open_channel(argv[2], O_WRONLY);
 
-        char msg[LENGTH];
-        int i = 0;
+    char msg[LENGTH];
 
-        while ((msg[i++] = getchar()) != EOF) {
-            if (msg[i] == '\n') {
-                memset(msg+i, '\0', LENGTH-i);
-                memwrite_to_channel(fsession, msg);
-                i = 0;
-                continue;
-            }
-
-            if (i == (LENGTH-1)) {
-                do {
-                    msg[i] = getchar();
-                } while ((msg[i] != EOF) && (msg[i] != '\n'));
-
-                if (msg[i] == EOF) break;
-
-                msg[i] = '\0';
-                memwrite_to_channel(fsession, msg);
-                i = 0;
-                continue;
-            }
-        }
-
-        close_channel(fsession);
+    while (scan_message(msg)) {
+        send_message(fd, 9, msg);
     }
+
+    close_channel(fd);
 
     // delete channel
 

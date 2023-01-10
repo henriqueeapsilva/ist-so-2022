@@ -8,34 +8,23 @@
 void create_channel(const char *name, mode_t mode);
 void delete_channel(const char *name);
 
-int open_channel(char *name, int flags);
+int open_channel(const char *name, int flags);
 void close_channel(int fd);
 
-size_t write_to_channel(int fd, const void *buffer, size_t len);
-size_t read_from_channel(int fd, void *buffer, size_t len);
+/**
+ * Sends a protocol message to the given channel.
+ * There are 10 valid operations:
+ */
+void send_message(int fd, uint8_t code, ...);
 
 /**
- * Force write to the channel.
- * Retries to send whatever was not sent in the beginning.
+ * Sends a quick protocol message to the given channel (which is currently closed).
+ * The channel will be open so that the message can be sent, then it will be closed.
  */
-void fwrite_to_channel(int fd, const void *buffer, size_t len);
+void send_quick_message(const char *name, uint8_t code, ...);
 
-/**
- * Force read from the channel.
- * Retries to receive whatever was not received in the beginning.
- */
-void fread_from_channel(int fd, void *buffer, size_t len);
+uint8_t receive_code(int fd);
 
-/**
- * Writes a piece of data to the channel.
- */
-void memwrite_to_channel(int fd, void *ptr);
-
-/**
- * Writes a string to the channel, filling the end with '\0'.
- */
-void strwrite_to_channel(int fd, char *string, size_t len);
-
-void send_protocol_message(int fd, uint8_t code, ...);
+void receive_content(int fd, uint8_t code, ...);
 
 #endif

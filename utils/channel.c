@@ -24,7 +24,7 @@ void delete_channel(const char *name) {
     }
 }
 
-int open_channel(char *name, int flags) {
+int open_channel(const char *name, int flags) {
     int fd = open(name, flags);
 
     if (fd == -1) {
@@ -42,7 +42,7 @@ void close_channel(int fd) {
     }
 }
 
-size_t write_to_channel(int fd, const void *buffer, size_t len) {
+static size_t write_to_channel(int fd, const void *buffer, size_t len) {
     ssize_t ret;
 
     while ((ret = write(fd, buffer, len) == -1) && (errno == EINTR));
@@ -55,7 +55,7 @@ size_t write_to_channel(int fd, const void *buffer, size_t len) {
     return (size_t) ret;
 }
 
-size_t read_from_channel(int fd, void *buffer, size_t len) {
+static size_t read_from_channel(int fd, void *buffer, size_t len) {
     ssize_t ret;
 
     while ((ret = read(fd, buffer, len) == -1) && (errno == EINTR));
@@ -68,7 +68,7 @@ size_t read_from_channel(int fd, void *buffer, size_t len) {
     return (size_t) ret;
 }
 
-void fwrite_to_channel(int fd, const void *buffer, size_t len) {
+static void fwrite_to_channel(int fd, const void *buffer, size_t len) {
     size_t written = 0;
 
     while (written < len) {
@@ -76,70 +76,68 @@ void fwrite_to_channel(int fd, const void *buffer, size_t len) {
     }
 }
 
-void fread_from_channel(int fd, void *buffer, size_t len) {
+static size_t fread_from_channel(int fd, void *buffer, size_t len) {
     size_t read = 0;
 
-    while (read < len) {
+    do {
         read += read_from_channel(fd, (buffer + read), (len - read));
-    }
+    } while ((read < len) && (read != 0));
+
+    return read;
 }
 
-void memwrite_to_channel(int fd, void *ptr) {
+/**
+ * Writes a piece of data to the channel.
+ */
+static void memwrite_to_channel(int fd, void *ptr) {
     fwrite_to_channel(fd, ptr, sizeof(ptr));
 }
 
-void strwrite_to_channel(int fd, char *string, size_t len) {
+/**
+ * Writes a string to the channel, filling the end with '\0'.
+ */
+static void strwrite_to_channel(int fd, char *string, size_t len) {
     char buffer[len];
     strncpy(buffer, string, len - 1);
     buffer[len - 1] = '\0';
     fwrite_to_channel(fd, buffer, len);
 }
 
-void send_protocol_message(int fd, uint8_t code, ...) {
-    va_list ap;
-    va_start(ap, code);
-
+static void vsend_message(int fd, uint8_t code, va_list ap) {
     switch (code) {
-        case 1: // publisher resgitration
-        case 2: // subscriber registration
-        case 3: // create box request
-        case 5: // remove box request
-
+        case 1: /* register publisher request */
+        case 2: /* register subscriber request */
+        case 3: /* create box request */
+        case 5: /* remove box request */
             /*
              * 1. code (uint8_t)
              * 2. client_named_pipe_path (char[256])
              * 3. box_name (char[32])
              */
-
             memwrite_to_channel(fd, &code);
             strwrite_to_channel(fd, va_arg(ap, char*), 256);
             strwrite_to_channel(fd, va_arg(ap, char*), 32);
             break;
-        case 4: // create box response
-        case 6: // remove box response
-
+        case 4: /* create box response */
+        case 6: /* remove box response */
             /*
              * 1. code (uint8_t)
              * 2. error_code (int32_t)
              * 3. error_message (char[1024])
              */
-
             memwrite_to_channel(fd, &code);
             memwrite_to_channel(fd, va_arg(ap, int32_t*));
             strwrite_to_channel(fd, va_arg(ap, char*), 1024);
             break;
-        case 7: // box list request
-
+        case 7: /* list boxes request */
             /*
              * 1. code (uint8_t)
              * 2. client_named_pipe_path (char[256])
              */
-
             memwrite_to_channel(fd, &code);
             strwrite_to_channel(fd, va_arg(ap, char*), 256);
             break;
-        case 8: // box list response
-
+        case 8: /* list boxes response */
             /*
              * 1. code (uint8_t)
              * 2. last (uint8_t)
@@ -148,7 +146,6 @@ void send_protocol_message(int fd, uint8_t code, ...) {
              * 5. n_publishers (uint64_t)
              * 6. n_subscribers (uint64_t)
              */
-
             memwrite_to_channel(fd, &code);
             memwrite_to_channel(fd, va_arg(ap, uint8_t*));
             strwrite_to_channel(fd, va_arg(ap, char*), 32);
@@ -156,18 +153,75 @@ void send_protocol_message(int fd, uint8_t code, ...) {
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             break;
-        case 9:  // send message (publisher to server)
-        case 10: // send message (server to subscriber)
-
+        case 9:  /* send message (publisher to sender) */
+        case 10: /* send message (server to subscriber) */
             /*
              * 1. code (uint8_t)
              * 2. message (char[1024])
              */
-
             memwrite_to_channel(fd, &code);
             strwrite_to_channel(fd, va_arg(ap, char*), 1024);
             break;
-        default: // invalid operation code
+        default: /* invalid operation code */
+            break;
+    }
+}
+
+void send_quick_message(const char *name, uint8_t code, ...) {
+    int fd = open_channel(name, O_WRONLY);
+
+    va_list ap;
+    va_start(ap, code);
+    vsend_message(fd, code, ap);
+    va_end(ap);
+
+    close_channel(fd);
+}
+
+void send_message(int fd, uint8_t code, ...) {
+    va_list ap;
+    va_start(ap, code);
+    vsend_message(fd, code, ap);
+    va_end(ap);
+}
+
+uint8_t receive_code(int fd) {
+    uint8_t code; /* returns -1 in case of EOF */
+    return fread_from_channel(fd, &code, sizeof(uint8_t)) ? code : (0);
+}
+
+void receive_content(int fd, uint8_t code, ...) {
+    va_list ap;
+    va_start(ap, code);
+
+    switch (code) {
+        case 1:
+        case 2:
+        case 3:
+        case 5:
+            fread_from_channel(fd, va_arg(ap, char*), 256);
+            fread_from_channel(fd, va_arg(ap, char*), 32);
+            break;
+        case 4:
+        case 6:
+            fread_from_channel(fd, va_arg(ap, int32_t*), sizeof(int32_t));
+            fread_from_channel(fd, va_arg(ap, char*), 1024);
+            break;
+        case 7:
+            fread_from_channel(fd, va_arg(ap, char*), 256);
+            break;
+        case 8:
+            fread_from_channel(fd, va_arg(ap, uint8_t*), sizeof(uint8_t));
+            fread_from_channel(fd, va_arg(ap, char*), 32);
+            fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
+            fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
+            fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
+            break;
+        case 9:
+        case 10:
+            fread_from_channel(fd, va_arg(ap, char*), 1024);
+            break;
+        default:
             break;
     }
 

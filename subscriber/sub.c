@@ -3,8 +3,13 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #define LENGTH 1024 // the length of a message
+
+void sigint_handler(void) {
+    
+}
 
 int main(int argc, char **argv) {
     if (argc < 4) {
@@ -19,30 +24,29 @@ int main(int argc, char **argv) {
 
     // send registration request
 
-    {
-        int fd = open_channel(argv[1], 0640);
-
-        uint8_t code = 2;
-        memwrite_to_channel(fd, &code);
-        strwrite_to_channel(fd, argv[2], 256);
-        strwrite_to_channel(fd, argv[3], 32);
-
-        close_channel(fd);
-    }
+    send_quick_message(argv[1], 2, argv[2], argv[3]);
 
     // read messages
 
-    {
-        int fsession = open_channel(argv[2], O_RDONLY);
+    int fd = open_channel(argv[2], O_RDONLY);
 
-        char msg[LENGTH];
+    uint8_t code;
+    char msg[LENGTH];
 
-        while (read_from_channel(fsession, msg, LENGTH) > 0) {
-            printf("%s\n", msg);
+    while (1) {
+        if (!(code = receive_code(fd))) {
+            close_channel(fd);
+            // wait (block) for some publisher to appear
+            fd = open_channel(argv[2], O_RDONLY);
+            continue;
         }
 
-        close_channel(fsession);
+        printf("%s\n", msg);
     }
+
+    close_channel(fd);
+
+    // delete channel
 
     delete_channel(argv[2]);
 
