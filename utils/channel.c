@@ -1,12 +1,14 @@
 #include "channel.h"
+#include "box.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/unistd.h>
 #include <stdarg.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/unistd.h>
 
 /* Channel Handler */
 
@@ -114,8 +116,8 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
              * 3. box_name (char[32])
              */
             memwrite_to_channel(fd, &code);
-            strwrite_to_channel(fd, va_arg(ap, char*), 256);
-            strwrite_to_channel(fd, va_arg(ap, char*), 32);
+            strwrite_to_channel(fd, va_arg(ap, char*), MAX_CHANNEL_NAME_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), MAX_BOX_NAME_SIZE);
             break;
         case 4: /* create box response */
         case 6: /* remove box response */
@@ -126,7 +128,7 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
              */
             memwrite_to_channel(fd, &code);
             memwrite_to_channel(fd, va_arg(ap, int32_t*));
-            strwrite_to_channel(fd, va_arg(ap, char*), 1024);
+            strwrite_to_channel(fd, va_arg(ap, char*), MAX_MESSAGE_SIZE);
             break;
         case 7: /* list boxes request */
             /*
@@ -134,7 +136,7 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
              * 2. client_named_pipe_path (char[256])
              */
             memwrite_to_channel(fd, &code);
-            strwrite_to_channel(fd, va_arg(ap, char*), 256);
+            strwrite_to_channel(fd, va_arg(ap, char*), MAX_CHANNEL_NAME_SIZE);
             break;
         case 8: /* list boxes response */
             /*
@@ -147,7 +149,7 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
              */
             memwrite_to_channel(fd, &code);
             memwrite_to_channel(fd, va_arg(ap, uint8_t*));
-            strwrite_to_channel(fd, va_arg(ap, char*), 32);
+            strwrite_to_channel(fd, va_arg(ap, char*), MAX_BOX_NAME_SIZE);
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
@@ -177,19 +179,19 @@ void send_quick_message(const char *name, uint8_t code, ...) {
     close_channel(fd);
 }
 
-void send_message(int fd, uint8_t code, ...) {
+void write_message(int fd, uint8_t code, ...) {
     va_list ap;
     va_start(ap, code);
     vsend_message(fd, code, ap);
     va_end(ap);
 }
 
-uint8_t receive_code(int fd) {
+uint8_t read_code(int fd) {
     uint8_t code; /* returns -1 in case of EOF */
     return fread_from_channel(fd, &code, sizeof(uint8_t)) ? code : (0);
 }
 
-void receive_content(int fd, uint8_t code, ...) {
+void read_content(int fd, uint8_t code, ...) {
     va_list ap;
     va_start(ap, code);
 

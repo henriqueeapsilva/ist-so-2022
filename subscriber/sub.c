@@ -5,10 +5,8 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#define LENGTH 1024 // the length of a message
-
 void sigint_handler(void) {
-    
+    /* TODO: Handle SIGINT. */
 }
 
 int main(int argc, char **argv) {
@@ -27,18 +25,16 @@ int main(int argc, char **argv) {
     /* read messages */
     int fd = open_channel(argv[2], O_RDONLY);
 
-    char msg[LENGTH];
+    uint8_t code;
+    char buffer[1024];
 
-    while (1) {
-        if (!receive_code(fd)) {
-            close_channel(fd);
-            // wait (block) for some publisher to appear
-            fd = open_channel(argv[2], O_RDONLY);
-            continue;
-        }
-
-        printf("%s\n", msg);
+    while (code = read_code(fd)) {
+        read_content(fd, code, buffer);
+        puts(buffer);
     }
+
+    close_channel(argv[2]);
+    delete_channel(fd);
 
     return EXIT_SUCCESS;
 }

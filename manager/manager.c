@@ -50,13 +50,13 @@ int main(int argc, char **argv) {
     }
 
     int fd = open_channel(argv[2], O_RDONLY);
-    assert(receive_code(fd) == ++code);
+    assert(read_code(fd) == ++code);
 
     if (code == 8) { /* list boxes response */
         int32_t errcode;
         char errmessage[1024];
 
-        receive_content(fd, code, &errcode, errmessage);
+        read_content(fd, code, &errcode, errmessage);
 
         if (errcode) {
             fprintf(stdout, "ERROR %s\n", errmessage);
@@ -71,15 +71,15 @@ int main(int argc, char **argv) {
         uint64_t n_publishers;
         uint64_t n_subscribers;
 
-        receive_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
+        read_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
 
         if (!*box_name) {
             fprintf(stdout, "NO BOXES FOUND\n");
         } else {
             while (!last) {
                 /* TODO: Store boxes somewhere, sort alphabetically and only then print. */
-                assert(receive_code(fd) == code);
-                receive_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
+                assert(read_code(fd) == code);
+                read_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
             }
         }
     }

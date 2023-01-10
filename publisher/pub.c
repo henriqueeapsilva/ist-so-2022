@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     char msg[LENGTH];
 
     while (scan_message(msg)) {
-        send_message(fd, 9, msg);
+        write_message(fd, 9, msg);
     }
 
     close_channel(fd);
