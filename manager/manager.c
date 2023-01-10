@@ -77,6 +77,7 @@ int main(int argc, char **argv) {
             fprintf(stdout, "NO BOXES FOUND\n");
         } else {
             while (!last) {
+                /* TODO: Store boxes somewhere, sort alphabetically and only then print. */
                 assert(receive_code(fd) == code);
                 receive_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
             }
