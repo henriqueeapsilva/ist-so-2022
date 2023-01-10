@@ -39,16 +39,13 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    // create channel
-
+    /* create channel */
     create_channel(argv[2], 0640);
 
-    // send request
-
+    /* send request */
     send_quick_message(argv[1], 1, argv[2], argv[3]);
 
-    // publish messages
-
+    /* publish messages */
     int fd = open_channel(argv[2], O_WRONLY);
 
     char msg[LENGTH];
@@ -59,8 +56,7 @@ int main(int argc, char **argv) {
 
     close_channel(fd);
 
-    // delete channel
-
+    /* delete channel */
     delete_channel(argv[2]);
 
     return EXIT_SUCCESS;
