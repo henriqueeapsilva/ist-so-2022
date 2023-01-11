@@ -139,19 +139,38 @@ void register_sub(char *channel_name, char *box_name) {
         channel_write(fd, MSG_SER_TO_SUB, message);
     }
 
+    tfs_close(fhandle);
+    channel_close(fd);
+
     // Subscriber: session terminated.
 }
 
 void create_box(char *channel_name, char *box_name) {
-    (void)channel_name;
-    (void)box_name;
+    // Manager: session started.
+
+    int fd = channel_open(channel_name, O_WRONLY);
+
+    channel_close(fd);
+
+    // Manager: session terminated.
 }
 
 void remove_box(char *channel_name, char *box_name) {
-    (void)channel_name;
-    (void)box_name;
+    // Manager: session started.
+
+    int fd = channel_open(channel_name, O_WRONLY);
+
+    channel_close(fd);
+
+    // Manager: session terminated.
 }
 
 void list_boxes(char *channel_name) {
-    (void)channel_name;
+    // Manager: session started.
+
+    int fd = channel_open(channel_name, O_WRONLY);
+
+    channel_close(fd);
+
+    // Manager: session terminated.
 }
