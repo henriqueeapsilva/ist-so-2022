@@ -12,21 +12,21 @@
 
 /* Channel Handler */
 
-void create_channel(const char *name, mode_t mode) {
+void channel_create(const char *name, mode_t mode) {
     if (mkfifo(name, mode) == -1) {
         fprintf(stderr, "Could not create fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 }
 
-void delete_channel(const char *name) {
+void channel_delete(const char *name) {
     if ((unlink(name) == -1) && (errno != ENOENT)) {
         fprintf(stderr, "Could not unlink fifo (%s): %s\n", name, strerror(errno));
         exit(EXIT_FAILURE);
     }
 }
 
-int open_channel(const char *name, int flags) {
+int channel_open(const char *name, int flags) {
     int fd = open(name, flags);
 
     if (fd == -1) {
@@ -37,7 +37,7 @@ int open_channel(const char *name, int flags) {
     return fd;
 }
 
-void close_channel(int fd) {
+void channel_close(int fd) {
     if (close(fd) == -1) {
         fprintf(stderr, "Could not close fifo: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
@@ -88,28 +88,25 @@ static size_t fread_from_channel(int fd, void *buffer, size_t len) {
     return read;
 }
 
-/**
- * Writes a piece of data to the channel.
- */
 static void memwrite_to_channel(int fd, void *ptr) {
     fwrite_to_channel(fd, ptr, sizeof(ptr));
 }
 
-/**
- * Writes a string to the channel, filling the end with '\0'.
- */
 static void strwrite_to_channel(int fd, char *string, size_t len) {
     char buffer[len];
     buffer[len - 1] = '\0';
     fwrite_to_channel(fd, strncpy(buffer, string, len - 1), len);
 }
 
-static void vsend_message(int fd, uint8_t code, va_list ap) {
+void write_message(int fd, uint8_t code, ...) {
+    va_list ap;
+    va_start(ap, code);
+
     switch (code) {
-        case 1: /* register publisher request */
-        case 2: /* register subscriber request */
-        case 3: /* create box request */
-        case 5: /* remove box request */
+        case REGISTER_PUB:
+        case REGISTER_SUB:
+        case CREATE_BOX:
+        case REMOVE_BOX:
             /*
              * 1. code (uint8_t)
              * 2. client_named_pipe_path (char[256])
@@ -119,8 +116,8 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
             strwrite_to_channel(fd, va_arg(ap, char*), MAX_CHANNEL_NAME_SIZE);
             strwrite_to_channel(fd, va_arg(ap, char*), MAX_BOX_NAME_SIZE);
             break;
-        case 4: /* create box response */
-        case 6: /* remove box response */
+        case CREATE_BOX_RET:
+        case REMOVE_BOX_RET:
             /*
              * 1. code (uint8_t)
              * 2. error_code (int32_t)
@@ -130,7 +127,7 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
             memwrite_to_channel(fd, va_arg(ap, int32_t*));
             strwrite_to_channel(fd, va_arg(ap, char*), MAX_MESSAGE_SIZE);
             break;
-        case 7: /* list boxes request */
+        case LIST_BOXES:
             /*
              * 1. code (uint8_t)
              * 2. client_named_pipe_path (char[256])
@@ -138,7 +135,7 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
             memwrite_to_channel(fd, &code);
             strwrite_to_channel(fd, va_arg(ap, char*), MAX_CHANNEL_NAME_SIZE);
             break;
-        case 8: /* list boxes response */
+        case LIST_BOXES_RET:
             /*
              * 1. code (uint8_t)
              * 2. last (uint8_t)
@@ -154,8 +151,8 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             break;
-        case 9:  /* send message (publisher to sender) */
-        case 10: /* send message (server to subscriber) */
+        case MSG_PUB_TO_SER:
+        case MSG_SER_TO_SUB:
             /*
              * 1. code (uint8_t)
              * 2. message (char[1024])
@@ -163,68 +160,63 @@ static void vsend_message(int fd, uint8_t code, va_list ap) {
             memwrite_to_channel(fd, &code);
             strwrite_to_channel(fd, va_arg(ap, char*), 1024);
             break;
-        default: /* invalid operation code */
+        default:
+            // invalid operation code
             break;
     }
-}
 
-void send_quick_message(const char *name, uint8_t code, ...) {
-    int fd = open_channel(name, O_WRONLY);
-
-    va_list ap;
-    va_start(ap, code);
-    vsend_message(fd, code, ap);
-    va_end(ap);
-
-    close_channel(fd);
-}
-
-void write_message(int fd, uint8_t code, ...) {
-    va_list ap;
-    va_start(ap, code);
-    vsend_message(fd, code, ap);
     va_end(ap);
 }
 
-uint8_t read_code(int fd) {
-    uint8_t code; /* returns -1 in case of EOF */
-    return fread_from_channel(fd, &code, sizeof(uint8_t)) ? code : (0);
-}
-
-void read_content(int fd, uint8_t code, ...) {
-    va_list ap;
-    va_start(ap, code);
-
+static void va_channel_read_content(int fd, uint8_t code, va_list ap) {
     switch (code) {
-        case 1:
-        case 2:
-        case 3:
-        case 5:
+        case REGISTER_PUB:
+        case REGISTER_SUB:
+        case CREATE_BOX:
+        case REMOVE_BOX:
             fread_from_channel(fd, va_arg(ap, char*), 256);
             fread_from_channel(fd, va_arg(ap, char*), 32);
             break;
-        case 4:
-        case 6:
+        case CREATE_BOX_RET:
+        case REMOVE_BOX_RET:
             fread_from_channel(fd, va_arg(ap, int32_t*), sizeof(int32_t));
             fread_from_channel(fd, va_arg(ap, char*), 1024);
             break;
-        case 7:
+        case LIST_BOXES:
             fread_from_channel(fd, va_arg(ap, char*), 256);
             break;
-        case 8:
+        case LIST_BOXES_RET:
             fread_from_channel(fd, va_arg(ap, uint8_t*), sizeof(uint8_t));
             fread_from_channel(fd, va_arg(ap, char*), 32);
             fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
             fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
             fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
             break;
-        case 9:
-        case 10:
+        case MSG_PUB_TO_SER:
+        case MSG_SER_TO_SUB:
             fread_from_channel(fd, va_arg(ap, char*), 1024);
             break;
         default:
             break;
     }
+}
 
+void channel_read(int fd, uint8_t code, ...) {
+    assert(channel_read_code(fd) == code);
+    va_list ap;
+    va_start(ap, code);
+    va_channel_read_content(fd, code, ap);
+    va_end(ap);
+}
+
+uint8_t channel_read_code(int fd) {
+    uint8_t code; // returns -1 in case of EOF
+    return fread_from_channel(fd, &code, sizeof(uint8_t)) ? code : (0);
+}
+
+void channel_read_content(int fd, uint8_t code, ...) {
+    va_list ap;
+    va_start(ap, code);
+    va_channel_read_content(fd, code, ap);
     va_end(ap);
 }
