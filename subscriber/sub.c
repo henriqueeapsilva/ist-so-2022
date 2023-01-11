@@ -16,25 +16,29 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    /* create channel */
-    create_channel(argv[2], 0640);
+    channel_create(argv[2], 0640);
 
-    /* send registration request */
-    send_quick_message(argv[1], 2, argv[2], argv[3]);
-
-    /* read messages */
-    int fd = open_channel(argv[2], O_RDONLY);
-
-    uint8_t code;
-    char buffer[1024];
-
-    while (code = read_code(fd)) {
-        read_content(fd, code, buffer);
-        puts(buffer);
+    { // Send registration request.
+        int fd = channel_open(argv[1], 0640);
+        channel_write(fd, REGISTER_SUB, argv[2], argv[3]);
+        channel_close(fd);
     }
 
-    close_channel(argv[2]);
-    delete_channel(fd);
+    { // Receive messages.
+        int fd = channel_open(argv[2], O_RDONLY);
+
+        uint8_t code;
+        char message[1024];
+
+        while ((code = channel_read_code(fd))) {
+            channel_read_content(fd, code, message);
+            puts(message);
+        }
+
+        channel_close(fd);
+    }
+    
+    channel_delete(argv[2]);
 
     return EXIT_SUCCESS;
 }

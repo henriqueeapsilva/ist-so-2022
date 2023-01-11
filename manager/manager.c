@@ -14,20 +14,20 @@ static void print_usage() {
             "   manager <register_pipe_name> <pipe_name> list\n");
 }
 
-static int eval_request(int argc, char **argv) {
+static uint8_t eval_request(int argc, char **argv) {
     if (argc < 4)
         return 0;
 
     if (!strcmp(argv[3], "create")) {
-        return (argc >= 5) * 3;
+        return (argc >= 5) * CREATE_BOX;
     }
 
     if (!strcmp(argv[3], "remove")) {
-        return (argc >= 5) * 5;
+        return (argc >= 5) * REMOVE_BOX;
     }
 
     if (!strcmp(argv[3], "list")) {
-        return 7;
+        return LIST_BOXES;
     }
 
     return 0;
@@ -41,51 +41,64 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    create_channel(argv[2], 0640);
+    channel_create(argv[2], 0640);
 
-    if (code == 7) { /* list boxes request */
-        send_quick_message(argv[1], code, argv[2]);
-    } else { /* create/remove box request */
-        send_quick_message(argv[1], code, argv[2], argv[4]);
+
+    { // send request
+        int fd = channel_open(argv[1], 0640);
+
+        if (code == LIST_BOXES) { /* list boxes request */
+            channel_write(fd, code, argv[2]);
+        } else { /* create/remove box request */
+            channel_write(fd, code, argv[2], argv[4]);
+        }
+
+        channel_close(fd);
     }
 
-    int fd = open_channel(argv[2], O_RDONLY);
-    assert(read_code(fd) == ++code);
+    { // receive response
+        int fd = channel_open(argv[2], O_RDONLY);
 
-    if (code == 8) { /* list boxes response */
-        int32_t errcode;
-        char errmessage[1024];
+        // assumes: response code = request code + 1
+        assert(channel_read_code(fd) == ++code);
 
-        read_content(fd, code, &errcode, errmessage);
+        if (code == LIST_BOXES_RET) {
+            uint8_t last;
+            char box_name[32];
+            uint64_t box_size;
+            uint64_t n_publishers;
+            uint64_t n_subscribers;
 
-        if (errcode) {
-            fprintf(stdout, "ERROR %s\n", errmessage);
+            assert(channel_read_code(fd) == code);
+            channel_read_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
+
+            if (!*box_name) {
+                fprintf(stdout, "NO BOXES FOUND\n");
+            } else {
+                while (!last) {
+                    /* TODO: Store boxes somewhere, sort alphabetically and only then print. */
+                    assert(channel_read_code(fd) == code);
+                    channel_read_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
+                }
+            }
         } else {
-            fprintf(stdout, "OK\n");
-        }
-    } else { /* create/remove box response */
-        uint8_t code = 7;
-        uint8_t last;
-        char box_name[32];
-        uint64_t box_size;
-        uint64_t n_publishers;
-        uint64_t n_subscribers;
+            int32_t errcode;
+            char errmessage[1024];
 
-        read_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
+            assert(channel_read_code(fd) == code);
+            channel_read_content(fd, code, &errcode, errmessage);
 
-        if (!*box_name) {
-            fprintf(stdout, "NO BOXES FOUND\n");
-        } else {
-            while (!last) {
-                /* TODO: Store boxes somewhere, sort alphabetically and only then print. */
-                assert(read_code(fd) == code);
-                read_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
+            if (errcode) {
+                fprintf(stdout, "ERROR %s\n", errmessage);
+            } else {
+                fprintf(stdout, "OK\n");
             }
         }
+
+        channel_close(fd);
     }
 
-    close_channel(fd);
-    delete_channel(argv[2]);
+    channel_delete(argv[2]);
 
     return EXIT_SUCCESS;
 }

@@ -98,7 +98,7 @@ static void strwrite_to_channel(int fd, char *string, size_t len) {
     fwrite_to_channel(fd, strncpy(buffer, string, len - 1), len);
 }
 
-void write_message(int fd, uint8_t code, ...) {
+void channel_write(int fd, uint8_t code, ...) {
     va_list ap;
     va_start(ap, code);
 
@@ -168,7 +168,15 @@ void write_message(int fd, uint8_t code, ...) {
     va_end(ap);
 }
 
-static void va_channel_read_content(int fd, uint8_t code, va_list ap) {
+uint8_t channel_read_code(int fd) {
+    uint8_t code; // returns -1 in case of EOF
+    return fread_from_channel(fd, &code, sizeof(uint8_t)) ? code : (0);
+}
+
+void channel_read_content(int fd, uint8_t code, ...) {
+    va_list ap;
+    va_start(ap, code);
+    
     switch (code) {
         case REGISTER_PUB:
         case REGISTER_SUB:
@@ -199,24 +207,6 @@ static void va_channel_read_content(int fd, uint8_t code, va_list ap) {
         default:
             break;
     }
-}
 
-void channel_read(int fd, uint8_t code, ...) {
-    assert(channel_read_code(fd) == code);
-    va_list ap;
-    va_start(ap, code);
-    va_channel_read_content(fd, code, ap);
-    va_end(ap);
-}
-
-uint8_t channel_read_code(int fd) {
-    uint8_t code; // returns -1 in case of EOF
-    return fread_from_channel(fd, &code, sizeof(uint8_t)) ? code : (0);
-}
-
-void channel_read_content(int fd, uint8_t code, ...) {
-    va_list ap;
-    va_start(ap, code);
-    va_channel_read_content(fd, code, ap);
     va_end(ap);
 }

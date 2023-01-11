@@ -39,25 +39,29 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    /* create channel */
-    create_channel(argv[2], 0640);
+    channel_create(argv[2], 0640);
 
-    /* send request */
-    send_quick_message(argv[1], 1, argv[2], argv[3]);
+    { // Send registation request.
+        int fd = channel_open(argv[1], 0640);
 
-    /* publish messages */
-    int fd = open_channel(argv[2], O_WRONLY);
+        channel_write(fd, REGISTER_PUB, argv[2], argv[3]);
 
-    char msg[LENGTH];
-
-    while (scan_message(msg)) {
-        write_message(fd, 9, msg);
+        channel_close(fd);
     }
 
-    close_channel(fd);
+    { // Publish messages.
+        int fd = channel_open(argv[2], O_WRONLY);
 
-    /* delete channel */
-    delete_channel(argv[2]);
+        char msg[LENGTH];
+
+        while (scan_message(msg)) {
+            channel_write(fd, MSG_PUB_TO_SER, msg);
+        }
+
+        channel_close(fd);
+    }
+
+    channel_delete(argv[2]);
 
     return EXIT_SUCCESS;
 }

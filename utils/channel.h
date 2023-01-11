@@ -1,12 +1,12 @@
 #ifndef _CHANNEL_H_
 #define _CHANNEL_H_
 
+#define MAX_CHANNEL_NAME_SIZE (256)
+#define MAX_MESSAGE_SIZE (1024)
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>
-
-#define MAX_CHANNEL_NAME_SIZE (256)
-#define MAX_MESSAGE_SIZE (1024)
 
 /*
  * A channel allows two different threads/processes to easily
@@ -44,7 +44,7 @@
  *  [ code = 10 (uint8_t) ] | [ message (char[1024]) ]
  */
 
-typedef enum __attribute__((__packed__)) op_code {
+enum __attribute__((__packed__)) op_code {
     REGISTER_PUB=1, // register publisher request
     REGISTER_SUB,   // register subscriber request
     CREATE_BOX,     // create box request
@@ -112,19 +112,6 @@ void channel_close(int fd);
  * In case of error, the program will quit.
  */
 void channel_write(int fd, uint8_t code, ...);
-
-/**
- * Reads a message from the channel (uses read(3) syscall).
- * The message is deserialized accordingly to the protocol.
- * If the code read is not the same as the one given, the program will quit.
- * 
- * Input:
- *   - fd: file descriptor
- *   - code: operation code (determines how many arguments must be given)
- * 
- * In case of error, the program will quit.
- */
-void channel_read(int fd, uint8_t code, ...);
 
 /**
  * Reads the content of the next message available in the channel (uses read(3) syscall).
