@@ -84,7 +84,7 @@ void remove_box(char *channel_name, char *box_name) {
         }
 
         if(tfs_unlink(box_name) == -1){
-            channel_write(fd, code, -1 ,"Unable to delete box: tfs_unlink returned an error.");
+            channel_write(fd, code, -1 ,"Unable to remove box: tfs_unlink returned an error.");
             channel_close(fd);
             return;
         }
@@ -94,7 +94,7 @@ void remove_box(char *channel_name, char *box_name) {
         return;
     }
 
-    channel_write(fd, code, -1 ,"Unable to create box: no space available.");
+    channel_write(fd, code, -1 ,"Unable to remove box: box not found.");
     channel_close(fd);
 }
 
@@ -104,7 +104,7 @@ void list_boxes(char *channel_name) {
     uint8_t code = 8;
     uint8_t last = 1;
 
-    for (int i = MAX_BOX_COUNT; i < MAX_BOX_COUNT; i++) {
+    for (int i = MAX_BOX_COUNT-1; i >= 0; i++) {
         if (boxes[i].name[0]) {
             continue;
         }
@@ -114,6 +114,10 @@ void list_boxes(char *channel_name) {
         if (last) {
             last = 0;
         }
+    }
+
+    if (last) {
+        channel_write(fd, code, last, "", 0, 0, 0);
     }
 
     channel_close(fd);
@@ -160,10 +164,13 @@ void register_sub(char *channel_name, char *box_name) {
     int fhandle = tfs_open(box_name, TFS_O_CREAT);
 
     uint8_t code = 10;
+    int len = 1024;
+    char buffer[len];
+    tfs_read(fhandle, buffer, len);
 
-    // read messages from file and write to channel
-
-    
+    while (1) {
+        
+    }
 
     tfs_close(fhandle);
     channel_close(fd);

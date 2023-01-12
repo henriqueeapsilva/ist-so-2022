@@ -10,7 +10,6 @@
 #include <assert.h>
 #include <string.h>
 
-
 static char *reg_channel_name;
 static int max_sessions;
 
