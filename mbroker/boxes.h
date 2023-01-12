@@ -9,12 +9,12 @@ int destroy_boxes();
 
 void create_box(char *channel_name, char *box_name);
 
-void delete_box(char *channel_name, char *box_names);
+void remove_box(char *channel_name, char *box_names);
 
 void list_boxes(char *channel_name);
 
-void register_pub(char *channel_name);
+void register_pub(char *channel_name, char *box_names);
 
-void register_sub(char *channel_name);
+void register_sub(char *channel_name, char *box_names);
 
 #endif
