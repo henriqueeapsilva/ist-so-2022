@@ -1,5 +1,5 @@
-#ifndef _LOCK_H_
-#define _LOCK_H_
+#ifndef _THREAD_H_
+#define _THREAD_H_
 
 #include <pthread.h>
 
@@ -93,4 +93,4 @@ void rwlock_unlock(rwlock_t *);
  */
 void rwlock_destroy(rwlock_t *);
 
-#endif
+#endif // _THREAD_H_

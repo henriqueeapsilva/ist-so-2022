@@ -1,9 +1,7 @@
 #ifndef _CHANNEL_H_
 #define _CHANNEL_H_
 
-#define MAX_CHANNEL_NAME_SIZE (256)
-#define MAX_MESSAGE_SIZE (1024)
-
+#include "box.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -23,19 +21,19 @@
  * 
  * This protocol supports the following operations:
  * - Publisher registration request:
- *  [ code = 1 (uint8_t) ] | [ client_named_pipe_path (char[256]) ] | [ box_name (char[32]) ]
+ *  [ code = 1 (uint8_t) ] | [ client_channel_name (char[256]) ] | [ box_name (char[32]) ]
  * - Subscriber registration request:
- *  [ code = 2 (uint8_t) ] | [ client_named_pipe_path (char[256]) ] | [ box_name (char[32]) ]
+ *  [ code = 2 (uint8_t) ] | [ client_channel_name (char[256]) ] | [ box_name (char[32]) ]
  * - Create box request:
- *  [ code = 3 (uint8_t) ] | [ client_named_pipe_path (char[256]) ] | [ box_name (char[32]) ]
+ *  [ code = 3 (uint8_t) ] | [ client_channel_name (char[256]) ] | [ box_name (char[32]) ]
  * - Create box return:
  *  [ code = 4 (uint8_t) ] | [ return_code (int32_t) ] | [ error_message (char[1024]) ]
  * - Remove box request:
- *  [ code = 5 (uint8_t) ] | [ client_named_pipe_path (char[256]) ] | [ box_name (char[32]) ]
+ *  [ code = 5 (uint8_t) ] | [ client_channel_name (char[256]) ] | [ box_name (char[32]) ]
  * - Remove box return:
  *  [ code = 6 (uint8_t) ] | [ return_code (int32_t) ] | [ error_message (char[1024]) ]
  * - List boxes request:
- *  [ code = 7 (uint8_t) ] | [ client_named_pipe_path (char[256]) ]
+ *  [ code = 7 (uint8_t) ] | [ client_channel_name (char[256]) ]
  * - List boxes return:
  *  [ code = 8 (uint8_t) ] | [ last (uint8_t) ] | [ box_name (char[32]) ] | [ box_size (uint64_t) ] | [ n_publishers (uint64_t) ] | [ n_subscribers (uint64_t) ]
  * - Message (publisher to server)
@@ -44,17 +42,22 @@
  *  [ code = 10 (uint8_t) ] | [ message (char[1024]) ]
  */
 
+#define PROTOCOL_MAX_BOX_NAME_SIZE (32)
+#define PROTOCOL_MAX_CHANNEL_NAME_SIZE (256)
+#define PROTOCOL_MAX_MESSAGE_SIZE (1024)
+
 enum __attribute__((__packed__)) op_code {
-    REGISTER_PUB=1, // register publisher request
-    REGISTER_SUB,   // register subscriber request
-    CREATE_BOX,     // create box request
-    CREATE_BOX_RET, // create box response/return
-    REMOVE_BOX,     // remove box request
-    REMOVE_BOX_RET, // remove box response/return
-    LIST_BOXES,     // list boxes request
-    LIST_BOXES_RET, // list boxes response/return
-    MSG_PUB_TO_SER, // send message (from publisher to server)
-    MSG_SER_TO_SUB, // send message (from subscriber to server)
+    OP_UNDEF,
+    OP_REGISTER_PUB,
+    OP_REGISTER_SUB,
+    OP_CREATE_BOX,
+    OP_CREATE_BOX_RET,
+    OP_REMOVE_BOX,
+    OP_REMOVE_BOX_RET,
+    OP_LIST_BOXES,
+    OP_LIST_BOXES_RET,
+    OP_MSG_PUB_TO_SER,
+    OP_MSG_SER_TO_SUB,
 };
 
 /**
@@ -138,4 +141,4 @@ void channel_read_content(int fd, uint8_t code, ...);
  */
 uint8_t channel_read_code(int fd);
 
-#endif
+#endif // _CHANNEL_H_

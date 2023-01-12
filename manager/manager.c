@@ -19,15 +19,15 @@ static uint8_t eval_request(int argc, char **argv) {
         return 0;
 
     if (!strcmp(argv[3], "create")) {
-        return (argc >= 5) * CREATE_BOX;
+        return (argc >= 5) * OP_CREATE_BOX;
     }
 
     if (!strcmp(argv[3], "remove")) {
-        return (argc >= 5) * REMOVE_BOX;
+        return (argc >= 5) * OP_REMOVE_BOX;
     }
 
     if (!strcmp(argv[3], "list")) {
-        return LIST_BOXES;
+        return OP_LIST_BOXES;
     }
 
     return 0;
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
     { // send request
         int fd = channel_open(argv[1], 0640);
 
-        if (code == LIST_BOXES) { /* list boxes request */
+        if (code == OP_LIST_BOXES) { /* list boxes request */
             channel_write(fd, code, argv[2]);
         } else { /* create/remove box request */
             channel_write(fd, code, argv[2], argv[4]);
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
         // assumes: response code = request code + 1
         assert(channel_read_code(fd) == ++code);
 
-        if (code == LIST_BOXES_RET) {
+        if (code == OP_LIST_BOXES_RET) {
             uint8_t last;
             char box_name[32];
             uint64_t box_size;

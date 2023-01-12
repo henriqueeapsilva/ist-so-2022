@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#define MAX_BOX_COUNT (64)
 #define MAX_BOX_NAME_SIZE (32)
 
 typedef struct {
@@ -13,4 +12,4 @@ typedef struct {
     uint64_t n_subs;
 } Box;
 
-#endif
+#endif // _BOX_H_

@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 
     { // Send registration request.
         int fd = channel_open(argv[1], 0640);
-        channel_write(fd, REGISTER_SUB, argv[2], argv[3]);
+        channel_write(fd, OP_REGISTER_SUB, argv[2], argv[3]);
         channel_close(fd);
     }
 

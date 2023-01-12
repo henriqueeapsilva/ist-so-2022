@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     { // Send registation request.
         int fd = channel_open(argv[1], 0640);
 
-        channel_write(fd, REGISTER_PUB, argv[2], argv[3]);
+        channel_write(fd, OP_REGISTER_PUB, argv[2], argv[3]);
 
         channel_close(fd);
     }
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
         char msg[LENGTH];
 
         while (scan_message(msg)) {
-            channel_write(fd, MSG_PUB_TO_SER, msg);
+            channel_write(fd, OP_MSG_PUB_TO_SER, msg);
         }
 
         channel_close(fd);

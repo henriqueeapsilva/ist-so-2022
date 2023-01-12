@@ -1,5 +1,4 @@
 #include "channel.h"
-#include "box.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -9,8 +8,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/unistd.h>
-
-/* Channel Handler */
 
 void channel_create(const char *name, mode_t mode) {
     if (mkfifo(name, mode) == -1) {
@@ -103,21 +100,21 @@ void channel_write(int fd, uint8_t code, ...) {
     va_start(ap, code);
 
     switch (code) {
-        case REGISTER_PUB:
-        case REGISTER_SUB:
-        case CREATE_BOX:
-        case REMOVE_BOX:
+        case OP_REGISTER_PUB:
+        case OP_REGISTER_SUB:
+        case OP_CREATE_BOX:
+        case OP_REMOVE_BOX:
             /*
              * 1. code (uint8_t)
              * 2. client_named_pipe_path (char[256])
              * 3. box_name (char[32])
              */
             memwrite_to_channel(fd, &code);
-            strwrite_to_channel(fd, va_arg(ap, char*), MAX_CHANNEL_NAME_SIZE);
-            strwrite_to_channel(fd, va_arg(ap, char*), MAX_BOX_NAME_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_CHANNEL_NAME_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_BOX_NAME_SIZE);
             break;
-        case CREATE_BOX_RET:
-        case REMOVE_BOX_RET:
+        case OP_CREATE_BOX_RET:
+        case OP_REMOVE_BOX_RET:
             /*
              * 1. code (uint8_t)
              * 2. error_code (int32_t)
@@ -125,17 +122,17 @@ void channel_write(int fd, uint8_t code, ...) {
              */
             memwrite_to_channel(fd, &code);
             memwrite_to_channel(fd, va_arg(ap, int32_t*));
-            strwrite_to_channel(fd, va_arg(ap, char*), MAX_MESSAGE_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_MESSAGE_SIZE);
             break;
-        case LIST_BOXES:
+        case OP_LIST_BOXES:
             /*
              * 1. code (uint8_t)
              * 2. client_named_pipe_path (char[256])
              */
             memwrite_to_channel(fd, &code);
-            strwrite_to_channel(fd, va_arg(ap, char*), MAX_CHANNEL_NAME_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_CHANNEL_NAME_SIZE);
             break;
-        case LIST_BOXES_RET:
+        case OP_LIST_BOXES_RET:
             /*
              * 1. code (uint8_t)
              * 2. last (uint8_t)
@@ -146,13 +143,13 @@ void channel_write(int fd, uint8_t code, ...) {
              */
             memwrite_to_channel(fd, &code);
             memwrite_to_channel(fd, va_arg(ap, uint8_t*));
-            strwrite_to_channel(fd, va_arg(ap, char*), MAX_BOX_NAME_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_BOX_NAME_SIZE);
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             break;
-        case MSG_PUB_TO_SER:
-        case MSG_SER_TO_SUB:
+        case OP_MSG_PUB_TO_SER:
+        case OP_MSG_SER_TO_SUB:
             /*
              * 1. code (uint8_t)
              * 2. message (char[1024])
@@ -170,7 +167,7 @@ void channel_write(int fd, uint8_t code, ...) {
 
 uint8_t channel_read_code(int fd) {
     uint8_t code; // returns -1 in case of EOF
-    return fread_from_channel(fd, &code, sizeof(uint8_t)) ? code : (0);
+    return (fread_from_channel(fd, &code, sizeof(uint8_t)) == -1) ? code : (0);
 }
 
 void channel_read_content(int fd, uint8_t code, ...) {
@@ -178,30 +175,30 @@ void channel_read_content(int fd, uint8_t code, ...) {
     va_start(ap, code);
     
     switch (code) {
-        case REGISTER_PUB:
-        case REGISTER_SUB:
-        case CREATE_BOX:
-        case REMOVE_BOX:
+        case OP_REGISTER_PUB:
+        case OP_REGISTER_SUB:
+        case OP_CREATE_BOX:
+        case OP_REMOVE_BOX:
             fread_from_channel(fd, va_arg(ap, char*), 256);
             fread_from_channel(fd, va_arg(ap, char*), 32);
             break;
-        case CREATE_BOX_RET:
-        case REMOVE_BOX_RET:
+        case OP_CREATE_BOX_RET:
+        case OP_REMOVE_BOX_RET:
             fread_from_channel(fd, va_arg(ap, int32_t*), sizeof(int32_t));
             fread_from_channel(fd, va_arg(ap, char*), 1024);
             break;
-        case LIST_BOXES:
+        case OP_LIST_BOXES:
             fread_from_channel(fd, va_arg(ap, char*), 256);
             break;
-        case LIST_BOXES_RET:
+        case OP_LIST_BOXES_RET:
             fread_from_channel(fd, va_arg(ap, uint8_t*), sizeof(uint8_t));
             fread_from_channel(fd, va_arg(ap, char*), 32);
             fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
             fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
             fread_from_channel(fd, va_arg(ap, uint64_t*), sizeof(uint64_t));
             break;
-        case MSG_PUB_TO_SER:
-        case MSG_SER_TO_SUB:
+        case OP_MSG_PUB_TO_SER:
+        case OP_MSG_SER_TO_SUB:
             fread_from_channel(fd, va_arg(ap, char*), 1024);
             break;
         default:
