@@ -42,13 +42,8 @@
  *  [ code = 10 (uint8_t) ] | [ message (char[1024]) ]
  */
 
-#define PROTOCOL_MAX_BOX_NAME_SIZE (32)
-#define PROTOCOL_MAX_CHANNEL_NAME_SIZE (256)
-#define PROTOCOL_MAX_MESSAGE_SIZE (1024)
-
 enum __attribute__((__packed__)) op_code {
-    OP_UNDEF,
-    OP_REGISTER_PUB,
+    OP_REGISTER_PUB=1,
     OP_REGISTER_SUB,
     OP_CREATE_BOX,
     OP_CREATE_BOX_RET,

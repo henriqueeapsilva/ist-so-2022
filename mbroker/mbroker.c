@@ -10,22 +10,13 @@
 #include <assert.h>
 #include <string.h>
 
-static Box boxes[MAX_BOX_COUNT];
-
 
 static char *reg_channel_name;
 static int max_sessions;
 
 void worker(void);
 
-void register_pub(char *channel_name, char *box_name);
-void register_sub(char *channel_name, char *box_name);
-void create_box(char *channel_name, char *box_name);
-void remove_box(char *channel_name, char *box_name);
-void list_boxes(char *channel_name);
-
 int main(int argc, char **argv) {
-    (void)boxes;
     if(argc < 3) {
         fprintf(stderr, "usage: mbroker <register_pipe_name> <max_sessions> \n");
         return EXIT_SUCCESS;
@@ -34,16 +25,9 @@ int main(int argc, char **argv) {
     reg_channel_name = argv[1];
     max_sessions = atoi(argv[2]);
 
-    {
-        tfs_params params = tfs_default_params();
-
-        params.max_inode_count = MAX_BOX_COUNT;
-        params.max_open_files_count = (size_t) max_sessions;
-
-        tfs_init(&params);
-    }
-
     channel_create(reg_channel_name, 0640);
+
+    if(init_boxes()) return EXIT_FAILURE;
 
     while (1) {
         worker();
@@ -61,39 +45,39 @@ void worker() {
     uint8_t code = channel_read_code(fd);
     switch (code) {
         case OP_REGISTER_PUB: {
-            char channel_name[MAX_CHANNEL_NAME_SIZE];
-            char box_name[MAX_BOX_NAME_SIZE];
+            char channel_name[256];
+            char box_name[32];
 
             channel_read_content(fd, code, channel_name, box_name);
 
             register_pub(channel_name, box_name);
         } break;
         case OP_REGISTER_SUB: {
-            char channel_name[MAX_CHANNEL_NAME_SIZE];
-            char box_name[MAX_BOX_NAME_SIZE];
+            char channel_name[256];
+            char box_name[32];
 
             channel_read_content(fd, code, channel_name, box_name);
 
             register_sub(channel_name, box_name);
         } break;
         case OP_CREATE_BOX: {
-            char channel_name[MAX_CHANNEL_NAME_SIZE];
-            char box_name[MAX_BOX_NAME_SIZE];
+            char channel_name[256];
+            char box_name[32];
 
             channel_read_content(fd, code, channel_name, box_name);
 
             create_box(channel_name, box_name);
         } break;
         case OP_REMOVE_BOX: {
-            char channel_name[MAX_CHANNEL_NAME_SIZE];
-            char box_name[MAX_BOX_NAME_SIZE];
+            char channel_name[256];
+            char box_name[32];
 
             channel_read_content(fd, code, channel_name, box_name);
 
             remove_box(channel_name, box_name);
         } break;
         case OP_LIST_BOXES: {
-            char channel_name[MAX_CHANNEL_NAME_SIZE];
+            char channel_name[256];
 
             channel_read_content(fd, code, channel_name);
             
@@ -105,73 +89,4 @@ void worker() {
     }
 
     channel_close(fd);
-}
-
-void register_pub(char *channel_name, char *box_name) {
-    // Publisher: session started.
-
-    char message[MAX_STRING_SIZE];
-
-    uint8_t code;
-    int fd = channel_open(channel_name, O_RDONLY);
-    int fhandle = tfs_open(box_name, TFS_O_APPEND);
-
-    // Keep session while channel is open (code != 0).
-    while ((code = channel_read_code(fd))) {
-        assert(code == OP_MSG_PUB_TO_SER);
-        channel_read_content(fd, code, message);
-        tfs_write(fhandle, message, strlen(message)+1);
-    }
-
-    tfs_close(fhandle);
-
-    // Publisher: session terminated.
-}
-
-void register_sub(char *channel_name, char *box_name) {
-    // Subscriber: session started.
-
-    char message[MAX_STRING_SIZE];
-
-    int fd = channel_open(channel_name, O_WRONLY);
-    int fhandle = tfs_open(box_name, TFS_O_CREAT);
-
-    while (tfs_read(fhandle, message, MAX_STRING_SIZE) != -1) {
-        channel_write(fd, OP_MSG_SER_TO_SUB, message);
-    }
-
-    tfs_close(fhandle);
-    channel_close(fd);
-
-    // Subscriber: session terminated.
-}
-
-void create_box(char *channel_name, char *box_name) {
-    // Manager: session started.
-
-    int fd = channel_open(channel_name, O_WRONLY);
-
-    channel_close(fd);
-
-    // Manager: session terminated.
-}
-
-void remove_box(char *channel_name, char *box_name) {
-    // Manager: session started.
-
-    int fd = channel_open(channel_name, O_WRONLY);
-
-    channel_close(fd);
-
-    // Manager: session terminated.
-}
-
-void list_boxes(char *channel_name) {
-    // Manager: session started.
-
-    int fd = channel_open(channel_name, O_WRONLY);
-
-    channel_close(fd);
-
-    // Manager: session terminated.
 }

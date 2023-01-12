@@ -6,31 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define LENGTH 1024 // the length of a message
-
-int scan_message(char *msg) {
-    int i = 0;
-    
-    while ((msg[i++] = (char) getchar()) != EOF) {
-        if (msg[i] == '\n') {
-            memset(msg+i, '\0', (size_t) (LENGTH-i));
-            return 1;
-        }
-
-        if (i == (LENGTH-1)) {
-            do {
-                msg[i] = (char) getchar();
-            } while ((msg[i] != EOF) && (msg[i] != '\n'));
-
-            if (msg[i] == EOF) return 0;
-
-            msg[i] = '\0';
-            return 1;
-        }
-    }
-
-    return 0;
-}
+#define BUF_LENGTH 1024 // the length of a message
 
 int main(int argc, char **argv) {
     if (argc < 4) {
@@ -52,10 +28,25 @@ int main(int argc, char **argv) {
     { // Publish messages.
         int fd = channel_open(argv[2], O_WRONLY);
 
-        char msg[LENGTH];
+        char buf[BUF_LENGTH];
+        int i = 0;
 
-        while (scan_message(msg)) {
-            channel_write(fd, OP_MSG_PUB_TO_SER, msg);
+        while ((buf[i] = getchar()) != EOF) {
+            if (buf[i] != '\n') {
+                if (++i < BUF_LENGTH-1) {
+                    continue;
+                }
+
+                while (((buf[i] = getchar()) != EOF) && (buf[i] != '\n'));
+
+                if (buf[i] == EOF) {
+                    break;
+                }
+            }
+
+            buf[i] = 0;
+            channel_write(fd, OP_MSG_PUB_TO_SER, buf);
+            i = 0;
         }
 
         channel_close(fd);

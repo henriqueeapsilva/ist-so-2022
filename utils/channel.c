@@ -110,8 +110,8 @@ void channel_write(int fd, uint8_t code, ...) {
              * 3. box_name (char[32])
              */
             memwrite_to_channel(fd, &code);
-            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_CHANNEL_NAME_SIZE);
-            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_BOX_NAME_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), 256);
+            strwrite_to_channel(fd, va_arg(ap, char*), 32);
             break;
         case OP_CREATE_BOX_RET:
         case OP_REMOVE_BOX_RET:
@@ -122,7 +122,7 @@ void channel_write(int fd, uint8_t code, ...) {
              */
             memwrite_to_channel(fd, &code);
             memwrite_to_channel(fd, va_arg(ap, int32_t*));
-            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_MESSAGE_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), 1024);
             break;
         case OP_LIST_BOXES:
             /*
@@ -130,7 +130,7 @@ void channel_write(int fd, uint8_t code, ...) {
              * 2. client_named_pipe_path (char[256])
              */
             memwrite_to_channel(fd, &code);
-            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_CHANNEL_NAME_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), 256);
             break;
         case OP_LIST_BOXES_RET:
             /*
@@ -143,7 +143,7 @@ void channel_write(int fd, uint8_t code, ...) {
              */
             memwrite_to_channel(fd, &code);
             memwrite_to_channel(fd, va_arg(ap, uint8_t*));
-            strwrite_to_channel(fd, va_arg(ap, char*), PROTOCOL_MAX_BOX_NAME_SIZE);
+            strwrite_to_channel(fd, va_arg(ap, char*), 32);
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
             memwrite_to_channel(fd, va_arg(ap, uint64_t*));
