@@ -1,8 +1,10 @@
+/* -- Includes -- */
+
+#include "boxes.h"
 #include "../fs/operations.h"
 #include "../utils/channel.h"
 #include "../utils/logging.h"
 #include "../utils/thread.h"
-#include "boxes.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -10,10 +12,16 @@
 #include <assert.h>
 #include <string.h>
 
+/* -- Interface -- */
+
+void worker(void);
+
+/* -- Global Variables -- */
+
 static char *reg_channel_name;
 static int max_sessions;
 
-void worker(void);
+/* -- Functions -- */
 
 int main(int argc, char **argv) {
     if(argc < 3) {
@@ -38,7 +46,7 @@ int main(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
-void worker() {
+void worker(void) {
     int fd = channel_open(reg_channel_name, O_RDONLY);
 
     uint8_t code = channel_read_code(fd);
