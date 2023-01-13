@@ -20,7 +20,7 @@ int init_boxes() {
     }
 
     for (int i = 0; i < MAX_BOX_COUNT; i++) {
-        boxes[i].name[0] = '\0';
+        boxes[i].name[0] = 0;
     }
 
     return tfs_init(&params);
@@ -32,90 +32,107 @@ int destroy_boxes() {
     return tfs_destroy();
 }
 
-static int find_box(char *box_name) {
+/**
+ * Returns the next free box available to be used.
+ */
+static Box *next_box() {
     for (int i = 0; i < MAX_BOX_COUNT; i++) {
-        if (!strcmp(box_name, boxes[i].name)) {
-            return i;
+        if (!boxes[i].name[0]) {
+            return (boxes+i);
         }
     }
 
-    return -1;
+    return NULL;
+}
+
+static Box *find_box(char *box_name) {
+    for (int i = 0; i < MAX_BOX_COUNT; i++) {
+        if (!strcmp(box_name, boxes[i].name)) {
+            return (boxes+i);
+        }
+    }
+
+    return NULL;
 }
 
 void create_box(char *channel_name, char *box_name) {
+    // Manager: session started.
+
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 4;
 
-    for (int i = 0; i < MAX_BOX_COUNT; i++) {
-        if (boxes[i].name[0]) {
-            continue;
-        }
-        
-        int fhandle = tfs_open(box_name, TFS_O_CREAT);
+    Box *box = next_box();
 
-        if (fhandle == -1) {
-            channel_write(fd, code, -1 ,"Unable to delete box: tfs_open returned an error.");
-            channel_close(fd);
-            return;
-        }
-
-        tfs_close(fhandle);
-
-        strcpy(boxes[i].name, box_name);
-        boxes[i].size = 0;
-        boxes[i].n_pubs = 0;
-        boxes[i].n_subs = 0;
-        channel_write(fd, code, 0, "");
+    if (!box) {
+        channel_write(fd, code, -1, "Unable to create box: no space available.");
         channel_close(fd);
         return;
     }
 
-    channel_write(fd, code, -1, "Unable to create box: no space available.");
+    int fhandle = tfs_open(box_name, TFS_O_CREAT);
+
+    if (fhandle == -1) {
+        channel_write(fd, code, -1 ,"Unable to delete box: tfs_open returned an error.");
+        channel_close(fd);
+        return;
+    }
+
+    tfs_close(fhandle);
+
+    strcpy(box->name, box_name);
+    box->size = 0;
+    box->n_pubs = 0;
+    box->n_subs = 0;
+    channel_write(fd, code, 0, "");
     channel_close(fd);
+    
+    // Manager: session terminated.
 }
 
 void remove_box(char *channel_name, char *box_name) {
+    // Manager: session started.
+
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 6;
 
-    for (int i = 0; i < MAX_BOX_COUNT; i++) {
-        if (!strcmp(boxes[i].name, box_name)) {
-            continue;
-        }
+    Box *box = find_box(box_name);
 
-        if(tfs_unlink(box_name) == -1){
-            channel_write(fd, code, -1 ,"Unable to remove box: tfs_unlink returned an error.");
-            channel_close(fd);
-            return;
-        }
-
-        channel_write(fd, code, 0, "");
+    if (!box) {
+        channel_write(fd, code, -1 ,"Unable to remove box: box not found.");
         channel_close(fd);
         return;
     }
 
-    channel_write(fd, code, -1 ,"Unable to remove box: box not found.");
+    if (tfs_unlink(box_name) == -1){
+        channel_write(fd, code, -1 ,"Unable to remove box: tfs_unlink returned an error.");
+        channel_close(fd);
+        return;
+    }
+
+    channel_write(fd, code, 0, "");
     channel_close(fd);
+
+    // Manager: session terminated.
 }
 
 void list_boxes(char *channel_name) {
+    // Manager: session started.
+
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 8;
     uint8_t last = 1;
     
-    Box *box = &boxes[MAX_BOX_COUNT-1];
+    Box *box = (boxes+MAX_BOX_COUNT);
 
-    while (box >= boxes) {
+    while (--box >= boxes) {
         if (box->name[0]) {
             channel_write(fd, code, last, box->name, box->size, box->n_pubs, box->n_subs);
             last = 0;
             break;
         }
-
-        box--;
     }
 
     if (last) {
@@ -131,16 +148,20 @@ void list_boxes(char *channel_name) {
     }
 
     channel_close(fd);
+
+    // Manager: session terminated.
 }
 
 void register_pub(char *channel_name, char *box_name) {
-    int bnum = find_box(box_name);
+    // Publisher: session started.
 
-    if ((bnum == -1) || boxes[bnum].n_pubs) {
+    Box *box = find_box(box_name);
+
+    if (!box || box->n_pubs) {
         return;
     }
 
-    boxes[bnum].n_pubs = 1;
+    box->n_pubs = 1;
 
     int fd = channel_open(channel_name, O_RDONLY);
     int fhandle = tfs_open(box_name, TFS_O_APPEND);
@@ -154,16 +175,20 @@ void register_pub(char *channel_name, char *box_name) {
 
         channel_read_content(fd, code, buffer);
 
-        boxes[bnum].size += tfs_write(fhandle, buffer, strlen(buffer)+1);
+        box->size += tfs_write(fhandle, buffer, strlen(buffer)+1);
     }
 
     tfs_close(fhandle);
     channel_close(fd);
 
-    boxes[bnum].n_pubs = 0;
+    box->n_pubs = 0;
+
+    // Publisher: session terminated.
 }
 
 void register_sub(char *channel_name, char *box_name) {
+    // Subscriber: session started.
+
     int bnum = find_box(box_name);
 
     if (bnum == -1) {
@@ -192,9 +217,11 @@ void register_sub(char *channel_name, char *box_name) {
             towrite -= len;
         }
 
-        // block until more messages are published
+        // TODO: block until more messages are published.
     }
 
     tfs_close(fhandle);
     channel_close(fd);
+
+    // Subscriber: session terminated.
 }
