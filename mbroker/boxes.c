@@ -3,8 +3,10 @@
 #include "../utils/channel.h"
 #include <stdio.h>
 #include <fcntl.h>
+#include <string.h>
 
 #define MAX_BOX_COUNT (params.max_inode_count)
+#define BUF_LEN (1024)
 
 static tfs_params params;
 static Box *boxes;
@@ -66,7 +68,7 @@ void create_box(char *channel_name, char *box_name) {
         boxes[i].n_subs = 0;
         channel_write(fd, code, 0, "");
         channel_close(fd);
-        break;
+        return;
     }
 
     channel_write(fd, code, -1, "Unable to create box: no space available.");
@@ -103,21 +105,29 @@ void list_boxes(char *channel_name) {
 
     uint8_t code = 8;
     uint8_t last = 1;
+    
+    Box *box = &boxes[MAX_BOX_COUNT-1];
 
-    for (int i = MAX_BOX_COUNT-1; i >= 0; i++) {
-        if (boxes[i].name[0]) {
-            continue;
-        }
-
-        channel_write(fd, code, last, boxes[i].name, boxes[i].size, boxes[i].n_pubs, boxes[i].n_subs);
-
-        if (last) {
+    while (box >= boxes) {
+        if (box->name[0]) {
+            channel_write(fd, code, last, box->name, box->size, box->n_pubs, box->n_subs);
             last = 0;
+            break;
         }
+
+        box--;
     }
 
     if (last) {
         channel_write(fd, code, last, "", 0, 0, 0);
+        channel_close(fd);
+        return;
+    }
+
+    while (--box >= boxes) {
+        if (box->name[0]) {
+            channel_write(fd, code, last, box->name, box->size, box->n_pubs, box->n_subs);
+        }
     }
 
     channel_close(fd);
@@ -164,12 +174,25 @@ void register_sub(char *channel_name, char *box_name) {
     int fhandle = tfs_open(box_name, TFS_O_CREAT);
 
     uint8_t code = 10;
-    int len = 1024;
-    char buffer[len];
-    tfs_read(fhandle, buffer, len);
+
+    char buffer[BUF_LEN];
+
+    int offset = 0;
+    int towrite = 0;
+
+    towrite = tfs_read(fhandle, buffer, BUF_LEN);
 
     while (1) {
-        
+        while (towrite >= 0) {
+            channel_write(fd, code, buffer+offset);
+
+            size_t len = strlen(buffer)+1;
+    
+            offset += len;
+            towrite -= len;
+        }
+
+        // block until more messages are published
     }
 
     tfs_close(fhandle);
