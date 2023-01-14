@@ -25,6 +25,7 @@ void serialize_message(void *buffer, uint8_t code, ...) {
         strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 256));
         buffer += len;
         strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 32));
+        buffer = 0;
         break;
     case OP_CREATE_BOX_RET:
     case OP_REMOVE_BOX_RET:

@@ -17,9 +17,8 @@ int main(int argc, char **argv) {
 
     { // Send registation request.
         char buffer[2048];
-
         serialize_message(buffer, OP_REGISTER_PUB, argv[2], argv[3]);
-
+        printf("111");
         int fd = channel_open(argv[1], 0640);
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
@@ -52,7 +51,11 @@ int main(int argc, char **argv) {
             message[i] = 0;
 
             serialize_message(buffer, code, message);
-            channel_write(fd, buffer, sizeof(buffer));
+            if(channel_write(fd, buffer, sizeof(buffer)) == -1){
+                channel_close(fd);
+                channel_delete(argv[3]);
+                return EXIT_SUCCESS;
+            }
             i = 0;
         }
 

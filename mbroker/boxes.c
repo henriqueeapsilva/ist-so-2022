@@ -171,6 +171,7 @@ void register_pub(char *channel_name, char *box_name) {
 
     Box *box = find_box(box_name);
 
+
     if (!box || box->n_pubs) {
         return;
     }
