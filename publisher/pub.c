@@ -39,9 +39,16 @@ int main(int argc, char **argv) {
         int i = 0;
         int c;
 
-        while ((c = getchar()) != EOF) {
-            // TODO: detect channel being closed before newline.
+        // verifies if nothing went wrong
+        serialize_message(buffer, code, "b");
+        if (channel_write(fd, buffer, sizeof(buffer)) == -1) {
+            channel_close(fd);
+            channel_delete(argv[3]);
+            DEBUG("Session terminated.");
+            return EXIT_SUCCESS;
+        }
 
+        while ((c = getchar()) != EOF) {
             message[i] = (char) c;
 
             if (c != '\n') {

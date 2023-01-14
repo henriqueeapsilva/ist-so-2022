@@ -5,24 +5,30 @@
 #include <signal.h>
 #include <unistd.h>
 #include <assert.h>
+#include <string.h>
 
 #define __USE_POSIX199309 1
 
 static int fd;
 static int readed_message = 0;
+static char* pipe_name;
 
 void sigint_handler(int sig) {
-    if(sig == SIGINT){
-        if(signal(SIGINT, sigint_handler) == SIG_ERR){
-            channel_close(fd);
-            if(write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0) _exit(EXIT_FAILURE);
-            _exit(EXIT_SUCCESS);
-        }
-        channel_close(fd);
+    DEBUG("Terminating session: closing channel.");
+    if(sig != SIGINT) _exit(EXIT_FAILURE);
+    if(signal(SIGINT, sigint_handler) == SIG_ERR){
+        channel_delete(pipe_name);
+        DEBUG("Session terminated.");
         if(write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0) _exit(EXIT_FAILURE);
         _exit(EXIT_SUCCESS);
     }
-    _exit(EXIT_FAILURE);
+
+    //channel_close(fd); -> commented : success
+    channel_delete(pipe_name);
+    DEBUG("Session terminated.");
+    if(write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0) _exit(EXIT_FAILURE);
+    _exit(EXIT_SUCCESS);
+
 }
 
 int main(int argc, char **argv) {
@@ -45,6 +51,7 @@ int main(int argc, char **argv) {
     channel_create(argv[2], 0640);
 
     { // Send registration request.
+        DEBUG("Sending registration request...");
         char buffer[2048];
 
         serialize_message(buffer, OP_REGISTER_SUB, argv[2], argv[3]);
@@ -52,10 +59,16 @@ int main(int argc, char **argv) {
         fd = channel_open(argv[1], O_WRONLY);
         channel_write(fd, buffer, 2048);
         channel_close(fd);
+        DEBUG("Registration request sent.");
     }
 
+    // stores the pipe name
+    pipe_name = argv[2];
+
     { // Receive messages.
+        DEBUG("Starting session: opening channel.");
         fd = channel_open(argv[2], O_RDONLY);
+        DEBUG("Session started.");
 
         uint8_t code = OP_MSG_SER_TO_SUB;
         char message[1024];
@@ -71,11 +84,5 @@ int main(int argc, char **argv) {
 
             readed_message++;
         }
-
-        channel_close(fd);
     }
-
-    channel_delete(argv[2]);
-
-    return EXIT_SUCCESS;
 }

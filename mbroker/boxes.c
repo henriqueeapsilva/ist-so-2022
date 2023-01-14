@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include "../utils/logging.h"
 
 #define MAX_BOX_COUNT (params.max_inode_count)
 
@@ -60,7 +61,7 @@ static Box *find_box(char *box_name) {
 void create_box(char *channel_name, char *box_name) {
     int fd = channel_open(channel_name, O_WRONLY);
 
-    uint8_t code = 4;
+    uint8_t code = OP_CREATE_BOX_RET;
     char buffer[2048];
 
     Box *box = next_box();
@@ -71,17 +72,19 @@ void create_box(char *channel_name, char *box_name) {
         channel_close(fd);
         return;
     }
-
+    DEBUG("Opened tfs");
     int fhandle = tfs_open(box_name, TFS_O_CREAT);
+    DEBUG("Ready to close");
 
     if (fhandle == -1) {
-        serialize_message(buffer, code, -1, "Unable to delete box: tfs_open returned an error.");
+        serialize_message(buffer, code, -1, "Unable to create box: tfs_open returned an error.");
+        DEBUG("entered here");
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
     }
-
     tfs_close(fhandle);
+    DEBUG("Closed tfs");
 
     strcpy(box->name, box_name);
     box->size = 0;
@@ -182,6 +185,9 @@ void register_pub(char *channel_name, char *box_name) {
     uint8_t code = OP_MSG_PUB_TO_SER;
     char buffer[2048];
     char message[1024];
+
+    // to catch the verification bite
+    channel_read(fd, buffer, sizeof(buffer));
 
     while (channel_read(fd, buffer, sizeof(buffer))) {
         DEBUG("Message received.");

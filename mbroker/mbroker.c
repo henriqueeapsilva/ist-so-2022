@@ -84,7 +84,9 @@ void worker(void) {
 
         deserialize_message(buffer, code, channel_name, box_name);
 
+        DEBUG("Action session: creating box");
         create_box(channel_name, box_name);
+        DEBUG("Action session: box analyzed");
     } break;
     case OP_REMOVE_BOX: {
         char channel_name[256];
@@ -92,14 +94,18 @@ void worker(void) {
 
         deserialize_message(buffer, code, channel_name, box_name);
 
+        DEBUG("Action session: removing box");
         remove_box(channel_name, box_name);
+        DEBUG("Action session: box analysed");
     } break;
     case OP_LIST_BOXES: {
         char channel_name[256];
 
         deserialize_message(buffer, code, channel_name);
 
+        DEBUG("Action session: listing boxes");
         list_boxes(channel_name);
+        DEBUG("Action session: boxes listed");
     } break;
     default:
         // invalid operation code
