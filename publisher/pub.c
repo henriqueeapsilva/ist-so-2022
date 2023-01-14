@@ -14,12 +14,13 @@ int main(int argc, char **argv) {
     }
 
     channel_create(argv[2], 0640);
+    printf("1");
+    fflush(stdout);
 
     { // Send registation request.
         char buffer[2048];
         serialize_message(buffer, OP_REGISTER_PUB, argv[2], argv[3]);
-        printf("111");
-        int fd = channel_open(argv[1], 0640);
+        int fd = channel_open(argv[1], O_WRONLY);
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
     }
@@ -51,11 +52,21 @@ int main(int argc, char **argv) {
             message[i] = 0;
 
             serialize_message(buffer, code, message);
+<<<<<<< HEAD
             if(channel_write(fd, buffer, sizeof(buffer)) == -1){
                 channel_close(fd);
                 channel_delete(argv[3]);
                 return EXIT_SUCCESS;
             }
+=======
+            
+            if (channel_write(fd, buffer, sizeof(buffer)) == -1) {
+                channel_close(fd);
+                channel_delete(argv[2]);
+                return EXIT_SUCCESS;
+            }
+
+>>>>>>> refs/remotes/origin/work
             i = 0;
         }
 

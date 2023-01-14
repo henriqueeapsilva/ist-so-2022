@@ -186,8 +186,6 @@ void register_pub(char *channel_name, char *box_name) {
     char message[1024];
 
     while (channel_read(fd, buffer, sizeof(buffer))) {
-        // TODO: catch read errors
-
         assert(deserialize_code(buffer) == code);
         deserialize_message(buffer, code, message);
 

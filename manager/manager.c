@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
             serialize_message(buffer, code, argv[2], argv[4]);
         }
 
-        int fd = channel_open(argv[1], 0640);
+        int fd = channel_open(argv[1], O_WRONLY);
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
     }
