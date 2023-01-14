@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 
     if (init_boxes())
         return EXIT_FAILURE;
-
+    
     while (1) {
         worker();
     }
@@ -52,11 +52,14 @@ int main(int argc, char **argv) {
 void worker(void) {
     char buffer[2048];
 
+    DEBUG("Waiting for some request.");
     int fd = channel_open(reg_channel_name, O_RDONLY);
     channel_read(fd, buffer, sizeof(buffer));
     channel_close(fd);
 
     uint8_t code = deserialize_code(buffer);
+
+    DEBUG("Request received. Code: %d", code);
 
     switch (code) {
     case OP_REGISTER_PUB: {
@@ -102,4 +105,6 @@ void worker(void) {
         // invalid operation code
         break;
     }
+
+    DEBUG("Request completed.")
 }

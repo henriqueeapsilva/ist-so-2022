@@ -2,6 +2,7 @@
 #include "../fs/operations.h"
 #include "../utils/channel.h"
 #include "../utils/protocol.h"
+#include "../utils/logging.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -57,8 +58,6 @@ static Box *find_box(char *box_name) {
 }
 
 void create_box(char *channel_name, char *box_name) {
-    // Manager: session started.
-
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 4;
@@ -92,13 +91,9 @@ void create_box(char *channel_name, char *box_name) {
 
     channel_write(fd, buffer, sizeof(buffer));
     channel_close(fd);
-
-    // Manager: session terminated.
 }
 
 void remove_box(char *channel_name, char *box_name) {
-    // Manager: session started.
-
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 6;
@@ -124,13 +119,9 @@ void remove_box(char *channel_name, char *box_name) {
     serialize_message(buffer, code, 0, "");
     channel_write(fd, buffer, sizeof(buffer));
     channel_close(fd);
-
-    // Manager: session terminated.
 }
 
 void list_boxes(char *channel_name) {
-    // Manager: session started.
-
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 8;
@@ -162,23 +153,30 @@ void list_boxes(char *channel_name) {
     }
 
     channel_close(fd);
-
-    // Manager: session terminated.
 }
 
 void register_pub(char *channel_name, char *box_name) {
-    // Publisher: session started.
+    DEBUG("Starting session: opening channel.");
+    int fd = channel_open(channel_name, O_RDONLY);
+    DEBUG("Session started.");
 
     Box *box = find_box(box_name);
 
 
     if (!box || box->n_pubs) {
+        DEBUG("Session terminated: box not found.");
+        channel_close(fd);
+        return;
+    }
+
+    if (box->n_pubs) {
+        DEBUG("Session terminated: only 1 publisher supported.");
+        channel_close(fd);
         return;
     }
 
     box->n_pubs = 1;
 
-    int fd = channel_open(channel_name, O_RDONLY);
     int fhandle = tfs_open(box_name, TFS_O_APPEND);
 
     uint8_t code = OP_MSG_PUB_TO_SER;
@@ -186,23 +184,24 @@ void register_pub(char *channel_name, char *box_name) {
     char message[1024];
 
     while (channel_read(fd, buffer, sizeof(buffer))) {
+        DEBUG("Message received.");
+
         assert(deserialize_code(buffer) == code);
         deserialize_message(buffer, code, message);
 
         box->size += (uint64_t) tfs_write(fhandle, message, strlen(message) + 1);
+        DEBUG("Message published.");
     }
+
+    box->n_pubs = 0;
 
     tfs_close(fhandle);
     channel_close(fd);
 
-    box->n_pubs = 0;
-
-    // Publisher: session terminated.
+    DEBUG("Session terminated.");
 }
 
 void register_sub(char *channel_name, char *box_name) {
-    // Subscriber: session started.
-
     Box *box = find_box(box_name);
 
     if (!box) {
@@ -235,6 +234,4 @@ void register_sub(char *channel_name, char *box_name) {
 
     tfs_close(fhandle);
     channel_close(fd);
-
-    // Subscriber: session terminated.
 }
