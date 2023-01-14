@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
+#include <assert.h>
 
 #define __USE_POSIX199309 1
 
@@ -48,7 +49,7 @@ int main(int argc, char **argv) {
 
         serialize_message(buffer, OP_REGISTER_SUB, argv[2], argv[3]);
 
-        int fd = channel_open(argv[1], 0640);
+        fd = channel_open(argv[1], 0640);
         channel_write(fd, buffer, 2048);
         channel_close(fd);
     }
