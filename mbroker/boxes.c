@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <string.h>
+#include <assert.h>
 
 #define MAX_BOX_COUNT (params.max_inode_count)
 #define BUF_LEN (1024)
@@ -175,7 +176,7 @@ void register_pub(char *channel_name, char *box_name) {
 
         channel_read_content(fd, code, buffer);
 
-        box->size += tfs_write(fhandle, buffer, strlen(buffer)+1);
+        box->size += (uint64_t)tfs_write(fhandle, buffer, strlen(buffer)+1);
     }
 
     tfs_close(fhandle);
@@ -189,9 +190,9 @@ void register_pub(char *channel_name, char *box_name) {
 void register_sub(char *channel_name, char *box_name) {
     // Subscriber: session started.
 
-    int bnum = find_box(box_name);
+    Box* box = find_box(box_name);
 
-    if (bnum == -1) {
+    if (!box) {
         return;
     }
 
@@ -202,8 +203,8 @@ void register_sub(char *channel_name, char *box_name) {
 
     char buffer[BUF_LEN];
 
-    int offset = 0;
-    int towrite = 0;
+    size_t offset = 0;
+    ssize_t towrite = 0;
 
     towrite = tfs_read(fhandle, buffer, BUF_LEN);
 
@@ -214,7 +215,7 @@ void register_sub(char *channel_name, char *box_name) {
             size_t len = strlen(buffer)+1;
     
             offset += len;
-            towrite -= len;
+            towrite -= (ssize_t)len;
         }
 
         // TODO: block until more messages are published.
