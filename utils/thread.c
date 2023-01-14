@@ -72,3 +72,27 @@ void rwlock_destroy(rwlock_t *rwlock) {
         quit("Could not destroy rwlock.");
     }
 }
+
+void cond_init(cond_t *cond) {
+    if(pthread_cond_init(cond, NULL)) {
+        quit("Could not init cond var.");
+    }
+}
+
+void cond_destroy(cond_t *cond) {
+    if(pthread_cond_destroy(cond)) {
+        quit("Could not destroy cond var.");
+    }
+}
+
+void cond_wait(cond_t *cond, mutex_t *mutex) {
+    if(pthread_cond_wait(cond, mutex)) {
+        quit("Could not wait - cond var.");
+    }
+}
+
+void cond_signal(cond_t *cond) {
+    if(pthread_cond_signal(cond)) {
+        quit("Could not send signal from cond var.");
+    }
+}

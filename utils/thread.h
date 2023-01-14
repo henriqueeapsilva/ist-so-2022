@@ -6,6 +6,7 @@
 typedef pthread_t thread_t;
 typedef pthread_mutex_t mutex_t;
 typedef pthread_rwlock_t rwlock_t;
+typedef pthread_cond_t cond_t;
 
 /**
  * Creates a thread.
@@ -92,5 +93,34 @@ void rwlock_unlock(rwlock_t *);
  * In case of error, the program will quit.
  */
 void rwlock_destroy(rwlock_t *);
+
+/**
+ * Initializes the given cond_var
+ *
+ * In case of error, the program will quit
+ * */
+void cond_init(cond_t *cond);
+
+
+/**
+ * Wait the given cond_var
+ *
+ * In case of error, the program will quit
+ * */
+void cond_wait(cond_t *cond, mutex_t *mutex);
+
+/**
+ * Signal the given cond_var
+ *
+ * In case of error, the program will quit
+ * */
+void cond_signal(cond_t *cond);
+
+/**
+ * Destroys the given cond_var
+ *
+ * In case of error, the program will quit
+ * */
+void cond_destroy(cond_t *cond);
 
 #endif // _THREAD_H_
