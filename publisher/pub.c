@@ -1,12 +1,10 @@
 #include "../utils/channel.h"
+#include "../utils/protocol.h"
 
 #include <fcntl.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define BUF_LENGTH 1024 // the length of a message
 
 int main(int argc, char **argv) {
     if (argc < 4) {
@@ -18,34 +16,43 @@ int main(int argc, char **argv) {
     channel_create(argv[2], 0640);
 
     { // Send registation request.
+        char buffer[2048];
+
+        serialize_message(buffer, OP_REGISTER_PUB, argv[2], argv[3]);
+
         int fd = channel_open(argv[1], 0640);
-
-        channel_write(fd, OP_REGISTER_PUB, argv[2], argv[3]);
-
+        channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
     }
 
     { // Publish messages.
         int fd = channel_open(argv[2], O_WRONLY);
 
-        char buf[BUF_LENGTH];
+        uint8_t code = OP_MSG_PUB_TO_SER;
+        char message[1024];
+        char buffer[2048];
         int i = 0;
+        int c;
 
-        while ((buf[i] = getchar()) != EOF) {
-            if (buf[i] != '\n') {
-                if (++i < BUF_LENGTH-1) {
+        while ((c = getchar()) != EOF) {
+            message[i] = (char) c;
+
+            if (c != '\n') {
+                if (++i < sizeof(buffer) - 1) {
                     continue;
                 }
 
-                while (((buf[i] = getchar()) != EOF) && (buf[i] != '\n'));
+                while (((c = getchar()) != EOF) && (c != '\n'));
 
-                if (buf[i] == EOF) {
+                if (c == EOF) {
                     break;
                 }
             }
 
-            buf[i] = 0;
-            channel_write(fd, OP_MSG_PUB_TO_SER, buf);
+            message[i] = 0;
+
+            serialize_message(buffer, code, message);
+            channel_write(fd, buffer, sizeof(buffer));
             i = 0;
         }
 

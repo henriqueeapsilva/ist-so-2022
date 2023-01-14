@@ -43,7 +43,7 @@ void channel_close(int fd) {
 }
 
 ssize_t channel_write(int fd, void *buffer, size_t len) {
-    ssize_t remaining = (ssize_t) len;
+    size_t remaining = len;
     ssize_t ret;
 
     while ((ret = write(fd, buffer, remaining)) && remaining) {
@@ -52,32 +52,38 @@ ssize_t channel_write(int fd, void *buffer, size_t len) {
                 continue;
             }
 
-            return -1;
-        }
-
-        buffer += ret;
-        remaining -= ret;
-    }
-
-    return (len - remaining);
-}
-
-ssize_t channel_read(int fd, void *buffer, size_t len) {
-    ssize_t remaining = (ssize_t) len;
-    ssize_t ret;
-
-    while ((ret = read(fd, buffer, len)) && remaining) {
-        if (ret == -1) {
-            if (errno != EINTR) {
+            if (errno == EPIPE) {
                 return -1;
             }
 
-            continue;
+            fprintf(stderr, "Could not write to fifo: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
         }
 
         buffer += ret;
-        remaining -= ret;
+        remaining -= (size_t) ret;
     }
 
-    return remaining;
+    return (ssize_t) (len - remaining);
+}
+
+ssize_t channel_read(int fd, void *buffer, size_t len) {
+    size_t remaining = len;
+    ssize_t ret;
+
+    while ((ret = read(fd, buffer, remaining)) && remaining) {
+        if (ret == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+
+            fprintf(stderr, "Could not read from fifo: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+
+        buffer += ret;
+        remaining -= (size_t) ret;
+    }
+
+    return (ssize_t) (len - remaining);
 }

@@ -1,6 +1,8 @@
 #include "../utils/channel.h"
+#include "../utils/protocol.h"
+#include "../utils/box.h"
+#include <assert.h>
 #include <fcntl.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,61 +43,64 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
+    char buffer[2048];
+
     channel_create(argv[2], 0640);
 
-
     { // send request
-        int fd = channel_open(argv[1], 0640);
 
         if (code == OP_LIST_BOXES) { /* list boxes request */
-            channel_write(fd, code, argv[2]);
+            serialize_message(buffer, code, argv[2]);
         } else { /* create/remove box request */
-            channel_write(fd, code, argv[2], argv[4]);
+            serialize_message(buffer, code, argv[2], argv[4]);
         }
 
+        int fd = channel_open(argv[1], 0640);
+        channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
     }
 
     { // receive response
         int fd = channel_open(argv[2], O_RDONLY);
+        channel_read(fd, buffer, sizeof(buffer));
+        channel_close(fd);
 
         // assumes: response code = request code + 1
-        assert(channel_read_code(fd) == ++code);
+        assert(deserialize_code(buffer) == ++code);
 
         if (code == OP_LIST_BOXES_RET) {
             uint8_t last;
-            char box_name[32];
-            uint64_t box_size;
-            uint64_t n_publishers;
-            uint64_t n_subscribers;
+            Box box;
 
-            assert(channel_read_code(fd) == code);
-            channel_read_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
+            assert(deserialize_code(buffer) == code);
 
-            if (!*box_name) {
+            deserialize_message(buffer, code, &last, box.name, &box.size,
+                                 &box.n_pubs, &box.n_subs);
+
+            if (!*(box.name)) {
                 fprintf(stdout, "NO BOXES FOUND\n");
             } else {
                 while (!last) {
-                    /* TODO: Store boxes somewhere, sort alphabetically and only then print. */
-                    assert(channel_read_code(fd) == code);
-                    channel_read_content(fd, code, &last, box_name, &box_size, &n_publishers, &n_subscribers);
+                    /* TODO: Store boxes somewhere, sort alphabetically and only
+                     * then print. */
+                    assert(deserialize_code(buffer) == code);
+                    deserialize_message(buffer, code, &last, box.name, &box.size,
+                                &box.n_pubs, &box.n_subs);
                 }
             }
         } else {
-            int32_t errcode;
+            int32_t retcode;
             char errmessage[1024];
 
-            assert(channel_read_code(fd) == code);
-            channel_read_content(fd, code, &errcode, errmessage);
+            assert(deserialize_code(buffer) == code);
+            deserialize_message(buffer, code, &retcode, errmessage);
 
-            if (errcode) {
+            if (retcode == -1) {
                 fprintf(stdout, "ERROR %s\n", errmessage);
             } else {
                 fprintf(stdout, "OK\n");
             }
         }
-
-        channel_close(fd);
     }
 
     channel_delete(argv[2]);

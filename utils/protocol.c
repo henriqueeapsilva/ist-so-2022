@@ -25,7 +25,6 @@ void serialize_message(void *buffer, uint8_t code, ...) {
         strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 256));
         buffer += len;
         strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 32));
-        buffer += len;
         break;
     case OP_CREATE_BOX_RET:
     case OP_REMOVE_BOX_RET:
@@ -37,7 +36,6 @@ void serialize_message(void *buffer, uint8_t code, ...) {
         memcpy(buffer, va_arg(ap, int32_t *), (len = sizeof(int32_t)));
         buffer += len;
         strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 1024));
-        buffer += len;
         break;
     case OP_LIST_BOXES:
         /*
@@ -45,7 +43,6 @@ void serialize_message(void *buffer, uint8_t code, ...) {
          * 2. client_named_pipe_path (char[256])
          */
         strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 256));
-        buffer += len;
         break;
     case OP_LIST_BOXES_RET:
         /*
@@ -65,7 +62,6 @@ void serialize_message(void *buffer, uint8_t code, ...) {
         memcpy(buffer, va_arg(ap, uint64_t *), (len = sizeof(uint64_t)));
         buffer += len;
         memcpy(buffer, va_arg(ap, uint64_t *), (len = sizeof(uint64_t)));
-        buffer += len;
         break;
     case OP_MSG_PUB_TO_SER:
     case OP_MSG_SER_TO_SUB:
@@ -74,7 +70,6 @@ void serialize_message(void *buffer, uint8_t code, ...) {
          * 2. message (char[1024])
          */
         strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 1024));
-        buffer += len;
         break;
     default:
         // invalid operation code
@@ -88,7 +83,6 @@ void deserialize_message(void *buffer, uint8_t code, ...) {
     va_list ap;
     va_start(ap, code);
 
-    size_t len;
     buffer += sizeof(uint8_t);
 
     switch (code) {

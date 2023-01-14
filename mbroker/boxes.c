@@ -1,19 +1,20 @@
 #include "boxes.h"
 #include "../fs/operations.h"
 #include "../utils/channel.h"
-#include <stdio.h>
+#include "../utils/protocol.h"
 #include <fcntl.h>
+#include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #define MAX_BOX_COUNT (params.max_inode_count)
-#define BUF_LEN (1024)
 
 static tfs_params params;
 static Box *boxes;
 
 int init_boxes() {
     params = tfs_default_params();
-    boxes = (Box*) malloc(sizeof(Box)*MAX_BOX_COUNT);
+    boxes = (Box *)malloc(sizeof(Box) * MAX_BOX_COUNT);
 
     if (!boxes) {
         return -1;
@@ -28,7 +29,7 @@ int init_boxes() {
 
 int destroy_boxes() {
     free(boxes);
-    
+
     return tfs_destroy();
 }
 
@@ -38,7 +39,7 @@ int destroy_boxes() {
 static Box *next_box() {
     for (int i = 0; i < MAX_BOX_COUNT; i++) {
         if (!boxes[i].name[0]) {
-            return (boxes+i);
+            return (boxes + i);
         }
     }
 
@@ -48,7 +49,7 @@ static Box *next_box() {
 static Box *find_box(char *box_name) {
     for (int i = 0; i < MAX_BOX_COUNT; i++) {
         if (!strcmp(box_name, boxes[i].name)) {
-            return (boxes+i);
+            return (boxes + i);
         }
     }
 
@@ -61,11 +62,13 @@ void create_box(char *channel_name, char *box_name) {
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 4;
+    char buffer[2048];
 
     Box *box = next_box();
 
     if (!box) {
-        channel_write(fd, code, -1, "Unable to create box: no space available.");
+        serialize_message(buffer, code, -1, "Unable to create box: no space available.");
+        channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
     }
@@ -73,7 +76,8 @@ void create_box(char *channel_name, char *box_name) {
     int fhandle = tfs_open(box_name, TFS_O_CREAT);
 
     if (fhandle == -1) {
-        channel_write(fd, code, -1 ,"Unable to delete box: tfs_open returned an error.");
+        serialize_message(buffer, code, -1, "Unable to delete box: tfs_open returned an error.");
+        channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
     }
@@ -84,9 +88,11 @@ void create_box(char *channel_name, char *box_name) {
     box->size = 0;
     box->n_pubs = 0;
     box->n_subs = 0;
-    channel_write(fd, code, 0, "");
+    serialize_message(buffer, code, 0, "");
+
+    channel_write(fd, buffer, sizeof(buffer));
     channel_close(fd);
-    
+
     // Manager: session terminated.
 }
 
@@ -96,22 +102,27 @@ void remove_box(char *channel_name, char *box_name) {
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 6;
+    char buffer[2048];
 
     Box *box = find_box(box_name);
 
     if (!box) {
-        channel_write(fd, code, -1 ,"Unable to remove box: box not found.");
+        serialize_message(buffer, code, -1, "Unable to remove box: box not found.");
+        channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
     }
 
-    if (tfs_unlink(box_name) == -1){
-        channel_write(fd, code, -1 ,"Unable to remove box: tfs_unlink returned an error.");
+    if (tfs_unlink(box_name) == -1) {
+        serialize_message(buffer, code, -1,
+                      "Unable to remove box: tfs_unlink returned an error.");
+        channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
     }
 
-    channel_write(fd, code, 0, "");
+    serialize_message(buffer, code, 0, "");
+    channel_write(fd, buffer, sizeof(buffer));
     channel_close(fd);
 
     // Manager: session terminated.
@@ -124,26 +135,29 @@ void list_boxes(char *channel_name) {
 
     uint8_t code = 8;
     uint8_t last = 1;
-    
-    Box *box = (boxes+MAX_BOX_COUNT);
+    char buffer[2048];
 
-    while (--box >= boxes) {
-        if (box->name[0]) {
-            channel_write(fd, code, last, box->name, box->size, box->n_pubs, box->n_subs);
-            last = 0;
-            break;
-        }
-    }
+    Box *box = (boxes + MAX_BOX_COUNT);
 
-    if (last) {
-        channel_write(fd, code, last, "", 0, 0, 0);
+    while ((--box >= boxes) && !(*box->name));
+
+    if (box < boxes) {
+        uint64_t dummy = 0;
+        serialize_message(buffer, code, &last, "", &dummy, &dummy, &dummy);
+        channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
+    } else {
+        serialize_message(buffer, code, &last, box->name, &box->size, &box->n_pubs, &box->n_subs);
+        channel_write(fd, buffer, sizeof(buffer));
+        last = 0;
     }
 
     while (--box >= boxes) {
-        if (box->name[0]) {
-            channel_write(fd, code, last, box->name, box->size, box->n_pubs, box->n_subs);
+        if (*box->name) {
+            serialize_message(buffer, code, &last, box->name, &box->size, &box->n_pubs,
+                          &box->n_subs);
+            channel_write(fd, buffer, sizeof(buffer));
         }
     }
 
@@ -166,16 +180,17 @@ void register_pub(char *channel_name, char *box_name) {
     int fd = channel_open(channel_name, O_RDONLY);
     int fhandle = tfs_open(box_name, TFS_O_APPEND);
 
-    uint8_t code;
+    uint8_t code = OP_MSG_PUB_TO_SER;
+    char buffer[2048];
+    char message[1024];
 
-    while ((code = channel_read_code(fd))) {
-        assert(code == 9);
+    while (channel_read(fd, buffer, sizeof(buffer))) {
+        // TODO: catch read errors
 
-        char buffer[1024];
+        assert(deserialize_code(buffer) == code);
+        deserialize_message(buffer, code, message);
 
-        channel_read_content(fd, code, buffer);
-
-        box->size += tfs_write(fhandle, buffer, strlen(buffer)+1);
+        box->size += (uint64_t) tfs_write(fhandle, message, strlen(message) + 1);
     }
 
     tfs_close(fhandle);
@@ -189,9 +204,9 @@ void register_pub(char *channel_name, char *box_name) {
 void register_sub(char *channel_name, char *box_name) {
     // Subscriber: session started.
 
-    int bnum = find_box(box_name);
+    Box *box = find_box(box_name);
 
-    if (bnum == -1) {
+    if (!box) {
         return;
     }
 
@@ -199,20 +214,19 @@ void register_sub(char *channel_name, char *box_name) {
     int fhandle = tfs_open(box_name, TFS_O_CREAT);
 
     uint8_t code = 10;
-
-    char buffer[BUF_LEN];
+    char buffer1[2048]; // file buffer
+    char buffer2[2048]; // channel buffer
 
     int offset = 0;
-    int towrite = 0;
-
-    towrite = tfs_read(fhandle, buffer, BUF_LEN);
+    int towrite = (int) tfs_read(fhandle, buffer1, sizeof(buffer1));
 
     while (1) {
         while (towrite >= 0) {
-            channel_write(fd, code, buffer+offset);
+            serialize_message(buffer2, code, buffer1 + offset);
+            channel_write(fd, buffer2, sizeof(buffer2));
 
-            size_t len = strlen(buffer)+1;
-    
+            int len = (int) strlen(buffer2) + 1;
+
             offset += len;
             towrite -= len;
         }

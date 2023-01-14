@@ -2,7 +2,6 @@
 #define _CHANNEL_H_
 
 #include "box.h"
-#include <stdint.h>
 #include <stdlib.h>
 #include <sys/types.h>
 
