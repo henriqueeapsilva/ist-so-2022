@@ -228,7 +228,7 @@ void register_sub(char *channel_name, char *box_name) {
             int len = (int) strlen(buffer2) + 1;
 
             offset += len;
-            towrite -= len;
+            towrite -= (ssize_t)len;
         }
 
         // TODO: block until more messages are published.
