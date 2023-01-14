@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 
         serialize_message(buffer, OP_REGISTER_SUB, argv[2], argv[3]);
 
-        fd = channel_open(argv[1], 0640);
+        fd = channel_open(argv[1], O_WRONLY);
         channel_write(fd, buffer, 2048);
         channel_close(fd);
     }
