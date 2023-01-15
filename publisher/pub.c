@@ -37,6 +37,14 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
+    struct sigaction sigact;
+
+    sigemptyset(&sigact.sa_mask);
+    sigaddset(&sigact.sa_mask, SIGINT);
+    sigaddset(&sigact.sa_mask, SIGPIPE);
+    sigact.sa_flags = SA_RESTART;
+    sigact.sa_handler = SIG_IGN;
+
     channel_create(argv[2], 0640);
 
     {
@@ -61,7 +69,7 @@ int main(int argc, char **argv) {
         LOG("Ready to publish messages.");
 
         // ignores the SIGPIPE
-        signal(SIGPIPE, SIG_IGN);
+        sigaction(SIGPIPE, &sigact, NULL);
 
         // verification: channel ready?
         if(channel_write(fd, buffer, sizeof(buffer)) == -1){
