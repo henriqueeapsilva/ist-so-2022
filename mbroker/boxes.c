@@ -164,7 +164,7 @@ void list_boxes(char *channel_name) {
     LOG("Manager: listing boxes...");
 
     uint8_t code = 8;
-    uint8_t last = 1;
+    uint8_t last = 0;
     char buffer[2048];
 
     Box *box = (boxes + MAX_BOX_COUNT);
@@ -178,11 +178,9 @@ void list_boxes(char *channel_name) {
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
-    } else {
-        serialize_message(buffer, code, &last, box->name, &box->size, &box->n_pubs, &box->n_subs);
-        channel_write(fd, buffer, sizeof(buffer));
-        last = 0;
     }
+
+    Box *temp = box;
 
     while (--box >= boxes) {
         if (*box->name) {
@@ -191,6 +189,12 @@ void list_boxes(char *channel_name) {
             channel_write(fd, buffer, sizeof(buffer));
         }
     }
+
+    last = 1;
+    box = temp;
+    serialize_message(buffer, code, &last, box->name, &box->size, &box->n_pubs,
+                    &box->n_subs);
+    channel_write(fd, buffer, sizeof(buffer));
 
     channel_close(fd);
     LOG("Manager: boxes listed.");
@@ -218,7 +222,16 @@ void register_pub(char *channel_name, char *box_name) {
 
     box->n_pubs = 1;
 
-    int fhandle = tfs_open(box_name, TFS_O_APPEND);
+    char filename[MAX_FILE_NAME];
+    sprintf(filename, "/%s", box_name);
+
+    int fhandle = tfs_open(filename, TFS_O_APPEND);
+
+    if (fhandle == -1) {
+        DEBUG("Session terminated: tfs_open returned an error.");
+        channel_close(fd);
+        return;
+    }
 
     uint8_t code = OP_MSG_PUB_TO_SER;
     char buffer[2048];

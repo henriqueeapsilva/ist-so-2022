@@ -75,8 +75,6 @@ int main(int argc, char **argv) {
         channel_read(fd, buffer, sizeof(buffer));
         LOG("Response received.");
         channel_close(fd);
-        
-        DEBUG("%d %d", deserialize_code(buffer), code);
 
         // assumes: response code = request code + 1
         assert(deserialize_code(buffer) == ++code);
