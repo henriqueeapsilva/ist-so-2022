@@ -2,12 +2,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <stdarg.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/unistd.h>
 
 void channel_create(const char *name, mode_t mode) {
     if (mkfifo(name, mode) == -1) {

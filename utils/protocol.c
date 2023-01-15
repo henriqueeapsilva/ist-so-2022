@@ -4,76 +4,67 @@
 #include <stdlib.h>
 #include <string.h>
 
+static size_t _memcpy(void *dest, void *src) {
+    size_t n = sizeof(src);
+    memcpy(dest, src, n);
+    return n;
+}
+
+static size_t _strncpy(void *dest, void *src, size_t n) {
+    strncpy(dest, src, n);
+    return sizeof(char) * n;
+}
+
 void serialize_message(void *buffer, uint8_t code, ...) {
+    buffer += _memcpy(buffer, &code);
+
     va_list ap;
     va_start(ap, code);
-
-    size_t len;
-    memcpy(buffer, &code, (len = sizeof(uint8_t)));
-    buffer += len;
 
     switch (code) {
     case OP_REGISTER_PUB:
     case OP_REGISTER_SUB:
     case OP_CREATE_BOX:
-    case OP_REMOVE_BOX:
-        /*
-         * 1. code (uint8_t)
-         * 2. client_named_pipe_path (char[256])
-         * 3. box_name (char[32])
-         */
-        strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 256));
-        buffer += len;
-        strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 32));
-        buffer = 0;
-        break;
+    case OP_REMOVE_BOX: {
+        char *channel = va_arg(ap, char*);
+        char *box = va_arg(ap, char*);
+
+        buffer += _strncpy(buffer, channel, 256);
+        buffer += _strncpy(buffer, box, 32);
+    } break;
     case OP_CREATE_BOX_RET:
-    case OP_REMOVE_BOX_RET:
-        /*
-         * 1. code (uint8_t)
-         * 2. error_code (int32_t)
-         * 3. error_message (char[1024])
-         */
-        memcpy(buffer, va_arg(ap, int32_t *), (len = sizeof(int32_t)));
-        buffer += len;
-        strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 1024));
-        break;
-    case OP_LIST_BOXES:
-        /*
-         * 1. code (uint8_t)
-         * 2. client_named_pipe_path (char[256])
-         */
-        strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 256));
-        break;
-    case OP_LIST_BOXES_RET:
-        /*
-         * 1. code (uint8_t)
-         * 2. last (uint8_t)
-         * 3. box_name (char[32])
-         * 4. box_size (uint64_t)
-         * 5. n_publishers (uint64_t)
-         * 6. n_subscribers (uint64_t)
-         */
-        memcpy(buffer, va_arg(ap, uint8_t *), (len = sizeof(uint8_t)));
-        buffer += len;
-        strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 32));
-        buffer += len;
-        memcpy(buffer, va_arg(ap, uint64_t *), (len = sizeof(uint64_t)));
-        buffer += len;
-        memcpy(buffer, va_arg(ap, uint64_t *), (len = sizeof(uint64_t)));
-        buffer += len;
-        memcpy(buffer, va_arg(ap, uint64_t *), (len = sizeof(uint64_t)));
-        break;
+    case OP_REMOVE_BOX_RET: {
+        int32_t error_code = va_arg(ap, int32_t);
+        char *error_message = va_arg(ap, char*);
+
+        buffer += _memcpy(buffer, &error_code);
+        buffer += _strncpy(buffer, error_message, 1024);
+    } break;
+    case OP_LIST_BOXES: {
+        char *box = va_arg(ap, char*);
+        
+        strncpy(buffer, box, 256);
+    } break;
+    case OP_LIST_BOXES_RET: {
+        uint8_t last = va_arg(ap, uint8_t);
+        char *box = va_arg(ap, char*);
+        uint64_t size = va_arg(ap, uint64_t);
+        uint64_t n_pubs = va_arg(ap, uint64_t);
+        uint64_t n_subs = va_arg(ap, uint64_t);
+
+        buffer += _memcpy(buffer, &last);
+        buffer += _strncpy(buffer, box, 32);
+        buffer += _memcpy(buffer, &size);
+        buffer += _memcpy(buffer, &n_pubs);
+        buffer += _memcpy(buffer, &n_subs);
+    } break;
     case OP_MSG_PUB_TO_SER:
-    case OP_MSG_SER_TO_SUB:
-        /*
-         * 1. code (uint8_t)
-         * 2. message (char[1024])
-         */
-        strncpy(buffer, va_arg(ap, char *), (len = sizeof(char) * 1024));
-        break;
-    default:
-        // invalid operation code
+    case OP_MSG_SER_TO_SUB: {
+        char *message = va_arg(ap, char*);
+
+        strncpy(buffer, message, 1024);
+    } break;
+    default: // invalid operation code
         break;
     }
 
@@ -81,45 +72,55 @@ void serialize_message(void *buffer, uint8_t code, ...) {
 }
 
 void deserialize_message(void *buffer, uint8_t code, ...) {
+    buffer += sizeof(uint8_t);
+
     va_list ap;
     va_start(ap, code);
-
-    buffer += sizeof(uint8_t);
 
     switch (code) {
     case OP_REGISTER_PUB:
     case OP_REGISTER_SUB:
     case OP_CREATE_BOX:
-    case OP_REMOVE_BOX:
-        strcpy(va_arg(ap, char *), buffer);
-        buffer += 256;
-        strcpy(va_arg(ap, char *), buffer);
-        break;
+    case OP_REMOVE_BOX: {
+        char *channel = va_arg(ap, char*);
+        char *box = va_arg(ap, char*);
+
+        buffer += _strncpy(channel, buffer, 256);
+        buffer += _strncpy(box, buffer, 32);
+    } break;
     case OP_CREATE_BOX_RET:
-    case OP_REMOVE_BOX_RET:
-        memcpy(va_arg(ap, int32_t *), buffer, sizeof(int32_t));
-        buffer += sizeof(int32_t);
-        strcpy(va_arg(ap, char *), buffer);
-        break;
-    case OP_LIST_BOXES:
-        strcpy(va_arg(ap, char *), buffer);
-        break;
-    case OP_LIST_BOXES_RET:
-        memcpy(va_arg(ap, uint8_t*), buffer, sizeof(uint8_t));
-        buffer += sizeof(uint8_t);
-        strcpy(va_arg(ap, char *), buffer);
-        buffer += 32;
-        memcpy(va_arg(ap, uint64_t*), buffer, sizeof(uint64_t));
-        buffer += sizeof(uint64_t);
-        memcpy(va_arg(ap, uint64_t*), buffer, sizeof(uint64_t));
-        buffer += sizeof(uint64_t);
-        memcpy(va_arg(ap, uint64_t*), buffer, sizeof(uint64_t));
-        break;
+    case OP_REMOVE_BOX_RET: {
+        int32_t error_code = va_arg(ap, int32_t);
+        char *error_message = va_arg(ap, char*);
+
+        buffer += _memcpy(&error_code, buffer);
+        buffer += _strncpy(error_message, buffer, 1024);
+    } break;
+    case OP_LIST_BOXES: {
+        char *box = va_arg(ap, char*);
+        
+        buffer += _strncpy(box, buffer, 256);
+    } break;
+    case OP_LIST_BOXES_RET: {
+        uint8_t last = va_arg(ap, uint8_t);
+        char *box = va_arg(ap, char*);
+        uint64_t size = va_arg(ap, uint64_t);
+        uint64_t n_pubs = va_arg(ap, uint64_t);
+        uint64_t n_subs = va_arg(ap, uint64_t);
+
+        buffer += _memcpy(&last, buffer);
+        buffer += _strncpy(box, buffer, 32);
+        buffer += _memcpy(&size, buffer);
+        buffer += _memcpy(&n_pubs, buffer);
+        buffer += _memcpy(&n_subs, buffer);
+    } break;
     case OP_MSG_PUB_TO_SER:
-    case OP_MSG_SER_TO_SUB:
-        strcpy(va_arg(ap, char *), buffer);
-        break;
-    default:
+    case OP_MSG_SER_TO_SUB: {
+        char *message = va_arg(ap, char*);
+
+        buffer += _strncpy(message, buffer, 1024);
+    } break;
+    default: // invalid operation code
         break;
     }
 

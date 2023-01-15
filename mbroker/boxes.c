@@ -324,8 +324,8 @@ void register_sub(char *channel_name, char *box_name) {
         // TODO: block until more messages are published.
     }
 
-    tfs_close(fhandle);
-    channel_close(fd);
+    //tfs_close(fhandle);
+    //channel_close(fd);
 
-    DEBUG("Session terminated.")
+    //DEBUG("Session terminated.")
 }

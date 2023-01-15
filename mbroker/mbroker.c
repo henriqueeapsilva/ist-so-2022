@@ -43,8 +43,8 @@ int main(int argc, char **argv) {
         worker();
     }
 
-    channel_delete(reg_channel_name);
-    tfs_destroy();
+    //channel_delete(reg_channel_name);
+    //tfs_destroy();
 
     return EXIT_SUCCESS;
 }
