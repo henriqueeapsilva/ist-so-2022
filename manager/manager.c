@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
                 fprintf(stdout, "NO BOXES FOUND\n");
             } else {
                 size_t count = 0;
-                
+
                 end++;
                 while (!last) {
                     channel_read(fd, buffer, sizeof(buffer));

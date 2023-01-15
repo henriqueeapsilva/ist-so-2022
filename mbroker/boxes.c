@@ -1,9 +1,9 @@
 #include "boxes.h"
 #include "../fs/operations.h"
-#include "../utils/thread.h"
 #include "../utils/channel.h"
 #include "../utils/logging.h"
 #include "../utils/protocol.h"
+#include "../utils/thread.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -250,7 +250,7 @@ void register_pub(char *channel_name, char *box_name) {
 
     while (channel_read(fd, buffer, sizeof(buffer))) {
         deserialize_message(buffer, code, message);
-        DEBUG("Characters published: %lu", strlen(message)+1);
+        DEBUG("Characters published: %lu", strlen(message) + 1);
         ssize_t ret = tfs_write(fhandle, message, strlen(message) + 1);
 
         if (ret == -1) {
@@ -301,7 +301,8 @@ void register_sub(char *channel_name, char *box_name) {
     char *message = buffer;
 
     while (1) {
-        while (!(towrite = tfs_read(fhandle, block, sizeof(block))));
+        while (!(towrite = tfs_read(fhandle, block, sizeof(block))))
+            ;
 
         if (towrite == -1) {
             DEBUG("Session terminated: tfs_read returned an error.");
