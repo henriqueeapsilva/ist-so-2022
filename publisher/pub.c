@@ -59,13 +59,16 @@ int main(int argc, char **argv) {
 
         LOG("Ready to publish messages.");
 
+        // Send some data to check if publisher was accepted.
+        // TODO: tatar SIGPIPE (grave)!!
+        // quando tentamos escrever para um pipe fechado, o write retorna -1 mas
+        // também é enviado um sinal SIGPIPE que se não for tratado, dá exit
+        // no programa e o canal não é fechado.
+        channel_write(fd, buffer, sizeof(buffer));
+
         while (scan_message(message) != -1) {
             serialize_message(buffer, code, message);
             
-            // TODO: tatar SIGPIPE (grave)!!
-            // quando tentamos escrever para um pipe fechado, o write retorna -1 mas
-            // também é enviado um sinal SIGPIPE que se não for tratado, dá exit
-            // no programa e o canal não é fechado.
             channel_write(fd, buffer, sizeof(buffer));
         }
 

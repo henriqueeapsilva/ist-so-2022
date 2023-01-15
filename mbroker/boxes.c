@@ -199,7 +199,7 @@ void register_pub(char *channel_name, char *box_name) {
     char buffer[2048];
     char message[1024];
 
-    // to catch the verification bite
+    // To catch the verification bite
     channel_read(fd, buffer, sizeof(buffer));
 
     while (channel_read(fd, buffer, sizeof(buffer))) {
