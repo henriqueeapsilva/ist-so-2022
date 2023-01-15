@@ -48,32 +48,31 @@ int main(int argc, char **argv) {
 
     channel_create(argv[2], 0640);
 
-    { // send request
-        DEBUG("Sending registration request...");
+    {
         if (code == OP_LIST_BOXES) { /* list boxes request */
             serialize_message(buffer, code, argv[2]);
         } else { /* create/remove box request */
             serialize_message(buffer, code, argv[2], argv[4]);
         }
 
+        LOG("Sending registration request (code: %d)...", code);
         int fd = channel_open(argv[1], O_WRONLY);
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
-        DEBUG("Registration request sent.");
+        LOG("Registration request sent.");
     }
 
-    { // receive response
-        DEBUG("Starting session: opening channel.");
+    {
         int fd = channel_open(argv[2], O_RDONLY);
+        LOG("Reading response...");
         channel_read(fd, buffer, sizeof(buffer));
+        LOG("Response received.");
         channel_close(fd);
-        DEBUG("Ending session: closing channel.");
 
         // assumes: response code = request code + 1
-        //assert(deserialize_code(buffer) == ++code);
+        assert(deserialize_code(buffer) == ++code);
 
         if (code == OP_LIST_BOXES_RET) {
-            DEBUG("Action session: listing boxes.");
             uint8_t last;
             Box box;
 
@@ -94,7 +93,6 @@ int main(int argc, char **argv) {
                 }
             }
         } else {
-            DEBUG("Action session: creating / deleting box.");
             int32_t retcode;
             char errmessage[1024];
 

@@ -34,11 +34,11 @@ int main(int argc, char **argv) {
     reg_channel_name = argv[1];
     max_sessions = atoi(argv[2]);
 
-    channel_create(reg_channel_name, 0640);
-
     if (init_boxes())
         return EXIT_FAILURE;
     
+    channel_create(reg_channel_name, 0640);
+
     while (1) {
         worker();
     }
@@ -52,14 +52,13 @@ int main(int argc, char **argv) {
 void worker(void) {
     char buffer[2048];
 
-    DEBUG("Waiting for some request.");
+    LOG("Waiting for some request.");
     int fd = channel_open(reg_channel_name, O_RDONLY);
     channel_read(fd, buffer, sizeof(buffer));
     channel_close(fd);
 
     uint8_t code = deserialize_code(buffer);
-
-    DEBUG("Request received. Code: %d", code);
+    LOG("Request received. Code: %d", code);
 
     switch (code) {
     case OP_REGISTER_PUB: {
@@ -84,9 +83,7 @@ void worker(void) {
 
         deserialize_message(buffer, code, channel_name, box_name);
 
-        DEBUG("Action session: creating box");
         create_box(channel_name, box_name);
-        DEBUG("Action session: box analyzed");
     } break;
     case OP_REMOVE_BOX: {
         char channel_name[256];
@@ -94,23 +91,19 @@ void worker(void) {
 
         deserialize_message(buffer, code, channel_name, box_name);
 
-        DEBUG("Action session: removing box");
         remove_box(channel_name, box_name);
-        DEBUG("Action session: box analysed");
     } break;
     case OP_LIST_BOXES: {
         char channel_name[256];
 
         deserialize_message(buffer, code, channel_name);
 
-        DEBUG("Action session: listing boxes");
         list_boxes(channel_name);
-        DEBUG("Action session: boxes listed");
     } break;
     default:
         // invalid operation code
         break;
     }
 
-    DEBUG("Request completed.")
+    LOG("Finished request.");
 }

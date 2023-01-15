@@ -18,17 +18,16 @@ void sigint_handler(int sig) {
     if(sig != SIGINT) _exit(EXIT_FAILURE);
     if(signal(SIGINT, sigint_handler) == SIG_ERR){
         channel_delete(pipe_name);
-        DEBUG("Session terminated.");
+        LOG("Session terminated.");
         if(write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0) _exit(EXIT_FAILURE);
         _exit(EXIT_SUCCESS);
     }
 
     //channel_close(fd); -> commented : success
     channel_delete(pipe_name);
-    DEBUG("Session terminated.");
+    LOG("Session terminated.");
     if(write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0) _exit(EXIT_FAILURE);
     _exit(EXIT_SUCCESS);
-
 }
 
 int main(int argc, char **argv) {
@@ -50,39 +49,50 @@ int main(int argc, char **argv) {
 
     channel_create(argv[2], 0640);
 
-    { // Send registration request.
-        DEBUG("Sending registration request...");
+    {
+        LOG("Sending registration request...");
         char buffer[2048];
 
         serialize_message(buffer, OP_REGISTER_SUB, argv[2], argv[3]);
 
         fd = channel_open(argv[1], O_WRONLY);
-        channel_write(fd, buffer, 2048);
+        channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
-        DEBUG("Registration request sent.");
+        LOG("Registration request sent.");
     }
 
     // stores the pipe name
     pipe_name = argv[2];
 
-    { // Receive messages.
-        DEBUG("Starting session: opening channel.");
+    {
         fd = channel_open(argv[2], O_RDONLY);
-        DEBUG("Session started.");
 
         uint8_t code = OP_MSG_SER_TO_SUB;
         char message[1024];
         char buffer[2048];
 
-        while (1) {
-            channel_read(fd, buffer, sizeof(buffer));
+        if (!channel_read(fd, buffer, sizeof(buffer))) {
+            LOG("Subscriber was rejected by the server.");
+            channel_close(fd);
+            channel_delete(argv[2]);
+            return EXIT_SUCCESS;
+        }
 
+        LOG("Ready to receive messages.");
+
+        while (1) {
             assert(deserialize_code(buffer) == code);
 
             deserialize_message(buffer, code, message);
             puts(message);
 
             readed_message++;
+
+            DEBUG("Messages counter: %d", readed_message);
+
+            channel_read(fd, buffer, sizeof(buffer));
         }
     }
+
+    return EXIT_SUCCESS;
 }

@@ -7,6 +7,28 @@
 #include <stdlib.h>
 #include <string.h>
 
+int scan_message(char *msg) {
+    char *end = msg+sizeof(msg);
+
+    while (msg < (end-1)) {
+        *msg = (char) getchar();
+
+        if (*msg == '\n') {
+            break;
+        }
+
+        if (*msg == EOF) {
+            return -1;
+        }
+    }
+
+    while (msg < end) {
+        *(msg++) = 0;
+    }
+
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc < 4) {
         fprintf(stderr,
@@ -16,69 +38,38 @@ int main(int argc, char **argv) {
 
     channel_create(argv[2], 0640);
 
-    { // Send registation request.
+    {
         char buffer[2048];
 
         serialize_message(buffer, OP_REGISTER_PUB, argv[2], argv[3]);
 
-        DEBUG("Sending registration request...");
+        LOG("Sending registration request...");
         int fd = channel_open(argv[1], O_WRONLY);
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
-        DEBUG("Registration request sent.");
+        LOG("Registration request sent.");
     }
 
-    { // Publish messages.
-        DEBUG("Starting session: opening channel.");
+    {
         int fd = channel_open(argv[2], O_WRONLY);
-        DEBUG("Session started.");
 
         uint8_t code = OP_MSG_PUB_TO_SER;
         char message[1024];
         char buffer[2048];
-        int i = 0;
-        int c;
 
-        // verifies if nothing went wrong
-        serialize_message(buffer, code, "b");
-        if (channel_write(fd, buffer, sizeof(buffer)) == -1) {
-            channel_close(fd);
-            channel_delete(argv[3]);
-            DEBUG("Session terminated.");
-            return EXIT_SUCCESS;
-        }
+        LOG("Ready to publish messages.");
 
-        while ((c = getchar()) != EOF) {
-            message[i] = (char) c;
-
-            if (c != '\n') {
-                if (++i < sizeof(buffer) - 1) {
-                    continue;
-                }
-
-                while (((c = getchar()) != EOF) && (c != '\n'));
-
-                if (c == EOF) {
-                    break;
-                }
-            }
-
-            message[i] = 0;
-
+        while (scan_message(message) != -1) {
             serialize_message(buffer, code, message);
-
-            if (channel_write(fd, buffer, sizeof(buffer)) == -1) {
-                channel_close(fd);
-                channel_delete(argv[3]);
-                return EXIT_SUCCESS;
-            }
-
-            i = 0;
+            
+            // TODO: tatar SIGPIPE (grave)!!
+            // quando tentamos escrever para um pipe fechado, o write retorna -1 mas
+            // também é enviado um sinal SIGPIPE que se não for tratado, dá exit
+            // no programa e o canal não é fechado.
+            channel_write(fd, buffer, sizeof(buffer));
         }
 
-        DEBUG("Terminating session: closing channel.");
         channel_close(fd);
-        DEBUG("Session terminated.");
     }
 
     channel_delete(argv[2]);
