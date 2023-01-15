@@ -41,8 +41,8 @@ int destroy_boxes() {
 static Box *next_box() {
     Box *end = boxes+MAX_BOX_COUNT;
 
-    for (Box *box = boxes; box < end; box--) {
-        if (!*box->name) {
+    for (Box *box = boxes; box < end; box++) {
+        if (!box->name[0]) {
             return box;
         }
     }
@@ -150,7 +150,7 @@ void remove_box(char *channel_name, char *box_name) {
         return;
     }
 
-    *box->name = 0;
+    box->name[0] = 0;
 
     serialize_message(buffer, code, &ret_code, "");
     channel_write(fd, buffer, sizeof(buffer));
@@ -167,11 +167,13 @@ void list_boxes(char *channel_name) {
     uint8_t last = 0;
     char buffer[2048];
 
-    Box *box = (boxes + MAX_BOX_COUNT);
+    Box *box;
+    Box *curr = boxes;
+    Box *end = curr + MAX_BOX_COUNT;
 
-    while ((--box >= boxes) && !(*box->name));
+    while ((curr < end) && (!*curr->name));
 
-    if (box < boxes) {
+    if (curr == end) {
         LOG("Manager: no boxes to list.");
         uint64_t dummy = 0;
         serialize_message(buffer, code, &last, "", &dummy, &dummy, &dummy);
@@ -180,20 +182,19 @@ void list_boxes(char *channel_name) {
         return;
     }
 
-    Box *temp = box;
-
-    while (--box >= boxes) {
-        if (*box->name) {
+    box = curr;
+    while (curr < end) {
+        if (*curr->name) {
             serialize_message(buffer, code, &last, box->name, &box->size, &box->n_pubs,
                           &box->n_subs);
             channel_write(fd, buffer, sizeof(buffer));
+            box = curr;
         }
     }
 
     last = 1;
-    box = temp;
     serialize_message(buffer, code, &last, box->name, &box->size, &box->n_pubs,
-                    &box->n_subs);
+                          &box->n_subs);
     channel_write(fd, buffer, sizeof(buffer));
 
     channel_close(fd);
@@ -206,7 +207,6 @@ void register_pub(char *channel_name, char *box_name) {
     DEBUG("Session started.");
 
     Box *box = find_box(box_name);
-
 
     if (!box) {
         DEBUG("Session terminated: box not found.");
