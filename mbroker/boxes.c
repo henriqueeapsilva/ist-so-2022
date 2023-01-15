@@ -171,7 +171,9 @@ void list_boxes(char *channel_name) {
     Box *curr = boxes;
     Box *end = curr + MAX_BOX_COUNT;
 
-    while ((curr < end) && (!*curr->name));
+    while ((curr < end) && (!*curr->name)) {
+        curr++;
+    }
 
     if (curr == end) {
         LOG("Manager: no boxes to list.");
@@ -190,6 +192,8 @@ void list_boxes(char *channel_name) {
             channel_write(fd, buffer, sizeof(buffer));
             box = curr;
         }
+
+        curr++;
     }
 
     last = 1;
