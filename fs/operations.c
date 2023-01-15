@@ -138,7 +138,6 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     }
 
     int inumber = file->of_inumber;
-    size_t offset = file->of_offset;
 
     wrlock_inode(inumber);
 
@@ -149,8 +148,8 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     // Determine how many bytes to write
     size_t block_size = state_block_size();
 
-    if ((to_write + offset) > block_size) {
-        to_write = (block_size - offset);
+    if ((to_write + file->of_offset) > block_size) {
+        to_write = (block_size - file->of_offset);
     }
 
     if (to_write == 0) {
@@ -171,10 +170,10 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
     ALWAYS_ASSERT(block, "tfs_write: data block deleted mid-write");
 
-    memcpy((block + offset), buffer, to_write);
+    memcpy((block + file->of_offset), buffer, to_write);
 
-    if ((offset += to_write) > inode->i_size) {
-        inode->i_size = offset;
+    if ((file->of_offset += to_write) > inode->i_size) {
+        inode->i_size = file->of_offset;
     }
 
     unlock_inode(inumber);
@@ -188,7 +187,6 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     }
 
     int inumber = file->of_inumber;
-    size_t offset = file->of_offset;
 
     rdlock_inode(inumber);
 
@@ -197,7 +195,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     ALWAYS_ASSERT(inode, "tfs_read: inode of open file deleted");
 
     // Determine how many bytes to read
-    size_t to_read = inode->i_size - offset;
+    size_t to_read = inode->i_size - file->of_offset;
 
     if (to_read > len) {
         to_read = len;
@@ -209,9 +207,9 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         ALWAYS_ASSERT(block != NULL, "tfs_read: data block deleted mid-read");
 
         // Perform the actual read
-        memcpy(buffer, (block + offset), to_read);
+        memcpy(buffer, (block + file->of_offset), to_read);
         // The offset associated with the file handle is incremented accordingly
-        offset += to_read;
+        file->of_offset += to_read;
     }
 
     unlock_inode(inumber);

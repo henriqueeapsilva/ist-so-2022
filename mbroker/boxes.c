@@ -249,11 +249,8 @@ void register_pub(char *channel_name, char *box_name) {
     channel_read(fd, buffer, sizeof(buffer));
 
     while (channel_read(fd, buffer, sizeof(buffer))) {
-        DEBUG("Message received.");
-
-        assert(deserialize_code(buffer) == code);
         deserialize_message(buffer, code, message);
-
+        DEBUG("Characters published: %lu", strlen(message)+1);
         ssize_t ret = tfs_write(fhandle, message, strlen(message) + 1);
 
         if (ret == -1) {
@@ -263,7 +260,6 @@ void register_pub(char *channel_name, char *box_name) {
         }
 
         box->size += (uint64_t)ret;
-        DEBUG("Message published.");
     }
 
     box->n_pubs = 0;
@@ -298,22 +294,19 @@ void register_sub(char *channel_name, char *box_name) {
         return;
     }
 
+    ssize_t towrite;
     uint8_t code = 10;
     char block[1024];
     char buffer[2048];
-    char *message;
+    char *message = buffer;
 
     while (1) {
-        ssize_t towrite = tfs_read(fhandle, block, sizeof(block));
+        while (!(towrite = tfs_read(fhandle, block, sizeof(block))));
 
         if (towrite == -1) {
             DEBUG("Session terminated: tfs_read returned an error.");
             channel_close(fd);
             return;
-        }
-
-        if (towrite == 0) {
-            continue;
         }
 
         DEBUG("Characters found inside the box: %ld", towrite);
@@ -323,17 +316,17 @@ void register_sub(char *channel_name, char *box_name) {
             serialize_message(buffer, code, message);
             channel_write(fd, buffer, sizeof(buffer));
 
-            size_t len = strlen(block) + 1;
+            size_t len = strlen(message) + 1;
 
             message += len;
             towrite -= (ssize_t)len;
-        }
 
-        // TODO: block until more messages are published.
+            DEBUG("towrite updated: %lu", towrite);
+        }
     }
 
-    // tfs_close(fhandle);
-    // channel_close(fd);
+    tfs_close(fhandle);
+    channel_close(fd);
 
-    // DEBUG("Session terminated.")
+    DEBUG("Session terminated.")
 }

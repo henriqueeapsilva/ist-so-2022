@@ -87,18 +87,19 @@ int main(int argc, char **argv) {
         LOG("Ready to receive messages.");
 
         while (1) {
-            assert(deserialize_code(buffer) == code);
-
             deserialize_message(buffer, code, message);
             fprintf(stdout, "%s\n", message);
 
             readed_message++;
 
-            DEBUG("Messages counter: %d", readed_message);
-
-            channel_read(fd, buffer, sizeof(buffer));
+            if (!channel_read(fd, buffer, sizeof(buffer))) {
+                break;
+            }
         }
+
+        channel_close(fd);
     }
 
+    channel_delete(argv[2]);
     return EXIT_SUCCESS;
 }

@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-int scan_message(char *msg) {
-    char *end = msg + sizeof(msg);
+int scan_message(char *msg, size_t len) {
+    char *end = msg + len;
 
     while (msg < (end - 1)) {
         *msg = (char)getchar();
@@ -21,6 +21,8 @@ int scan_message(char *msg) {
         if (*msg == EOF) {
             return -1;
         }
+
+        msg++;
     }
 
     while (msg < end) {
@@ -79,7 +81,9 @@ int main(int argc, char **argv) {
             return EXIT_SUCCESS;
         }
 
-        while (scan_message(message) != -1) {
+        while (scan_message(message, 1024) != -1) {
+            DEBUG("Message size: %lu", strlen(message));
+
             serialize_message(buffer, code, message);
 
             channel_write(fd, buffer, sizeof(buffer));
