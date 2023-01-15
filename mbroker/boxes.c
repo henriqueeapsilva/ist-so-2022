@@ -1,5 +1,6 @@
 #include "boxes.h"
 #include "../fs/operations.h"
+#include "../utils/thread.h"
 #include "../utils/channel.h"
 #include "../utils/logging.h"
 #include "../utils/protocol.h"
