@@ -9,10 +9,10 @@
 #include <assert.h>
 #include "../utils/logging.h"
 
-#define MAX_BOX_COUNT (params.max_inode_count)
-
 static tfs_params params;
 static Box *boxes;
+
+#define MAX_BOX_COUNT (params.max_inode_count)
 
 int init_boxes() {
     params = tfs_default_params();
@@ -23,7 +23,7 @@ int init_boxes() {
     }
 
     for (int i = 0; i < MAX_BOX_COUNT; i++) {
-        boxes[i].name[0] = 0;
+        boxes[i].name[0] = '\0';
     }
 
     return tfs_init(&params);
@@ -40,7 +40,7 @@ int destroy_boxes() {
  */
 static Box *next_box() {
     for (int i = 0; i < MAX_BOX_COUNT; i++) {
-        if (!boxes[i].name[0]) {
+        if (boxes[i].name[0] == '\0') {
             return (boxes + i);
         }
     }
@@ -64,17 +64,17 @@ void create_box(char *channel_name, char *box_name) {
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = OP_CREATE_BOX_RET;
+    int32_t ret_code = 0;
     char buffer[2048];
 
     Box *box = next_box();
 
     if (!box) {
         LOG("Manager: could not create box.");
-        serialize_message(buffer, OP_CREATE_BOX_RET, -1, "Unable to create box: no space available.");
-        DEBUG("message serialized (%d)", OP_CREATE_BOX_RET);
+        ret_code = -1;
+        serialize_message(buffer, code, &ret_code, "Unable to create box: no space available.");
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
-        LOG("closed channel");
         return;
     }
 
@@ -82,7 +82,8 @@ void create_box(char *channel_name, char *box_name) {
 
     if (fhandle == -1) {
         LOG("Manager: could not create box.");
-        serialize_message(buffer, code, -1, "Unable to create box: tfs_open returned an error.");
+        ret_code = -1;
+        serialize_message(buffer, code, &ret_code, "Unable to create box: tfs_open returned an error.");
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
@@ -94,7 +95,7 @@ void create_box(char *channel_name, char *box_name) {
     box->size = 0;
     box->n_pubs = 0;
     box->n_subs = 0;
-    serialize_message(buffer, code, 0, "");
+    serialize_message(buffer, code, ret_code, "");
 
     channel_write(fd, buffer, sizeof(buffer));
     channel_close(fd);
@@ -108,13 +109,15 @@ void remove_box(char *channel_name, char *box_name) {
     int fd = channel_open(channel_name, O_WRONLY);
 
     uint8_t code = 6;
+    int32_t ret_code = 0;
     char buffer[2048];
 
     Box *box = find_box(box_name);
 
     if (!box) {
         LOG("Manager: could not remove box.");
-        serialize_message(buffer, code, -1, "Unable to remove box: box not found.");
+        ret_code = -1;
+        serialize_message(buffer, code, &ret_code, "Unable to remove box: box not found.");
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
@@ -122,14 +125,15 @@ void remove_box(char *channel_name, char *box_name) {
 
     if (tfs_unlink(box_name) == -1) {
         LOG("Manager: could not remove box.");
-        serialize_message(buffer, code, -1,
+        ret_code = -1;
+        serialize_message(buffer, code, &ret_code,
                       "Unable to remove box: tfs_unlink returned an error.");
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
         return;
     }
 
-    serialize_message(buffer, code, 0, "");
+    serialize_message(buffer, code, &ret_code, "");
     channel_write(fd, buffer, sizeof(buffer));
     channel_close(fd);
 

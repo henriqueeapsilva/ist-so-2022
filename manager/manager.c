@@ -68,6 +68,8 @@ int main(int argc, char **argv) {
         channel_read(fd, buffer, sizeof(buffer));
         LOG("Response received.");
         channel_close(fd);
+        
+        DEBUG("%d %d", deserialize_code(buffer), code);
 
         // assumes: response code = request code + 1
         assert(deserialize_code(buffer) == ++code);
@@ -75,8 +77,6 @@ int main(int argc, char **argv) {
         if (code == OP_LIST_BOXES_RET) {
             uint8_t last;
             Box box;
-
-            assert(deserialize_code(buffer) == code);
 
             deserialize_message(buffer, code, &last, box.name, &box.size,
                                  &box.n_pubs, &box.n_subs);
@@ -96,8 +96,6 @@ int main(int argc, char **argv) {
             int32_t retcode;
             char errmessage[1024];
 
-            assert(deserialize_code(buffer) == code);
-            DEBUG("%d", code);
             deserialize_message(buffer, code, &retcode, errmessage);
 
             if (retcode == -1) {
