@@ -97,6 +97,7 @@ int main(int argc, char **argv) {
             char errmessage[1024];
 
             assert(deserialize_code(buffer) == code);
+            DEBUG("%d", code);
             deserialize_message(buffer, code, &retcode, errmessage);
 
             if (retcode == -1) {

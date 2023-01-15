@@ -70,9 +70,11 @@ void create_box(char *channel_name, char *box_name) {
 
     if (!box) {
         LOG("Manager: could not create box.");
-        serialize_message(buffer, code, -1, "Unable to create box: no space available.");
+        serialize_message(buffer, OP_CREATE_BOX_RET, -1, "Unable to create box: no space available.");
+        DEBUG("message serialized (%d)", OP_CREATE_BOX_RET);
         channel_write(fd, buffer, sizeof(buffer));
         channel_close(fd);
+        LOG("closed channel");
         return;
     }
 

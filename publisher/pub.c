@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 int scan_message(char *msg) {
     char *end = msg+sizeof(msg);
@@ -59,12 +60,16 @@ int main(int argc, char **argv) {
 
         LOG("Ready to publish messages.");
 
-        // Send some data to check if publisher was accepted.
-        // TODO: tatar SIGPIPE (grave)!!
-        // quando tentamos escrever para um pipe fechado, o write retorna -1 mas
-        // também é enviado um sinal SIGPIPE que se não for tratado, dá exit
-        // no programa e o canal não é fechado.
-        channel_write(fd, buffer, sizeof(buffer));
+        // ignores the SIGPIPE
+        signal(SIGPIPE, SIG_IGN);
+
+        // verification: channel ready?
+        if(channel_write(fd, buffer, sizeof(buffer)) == -1){
+            channel_close(fd);
+            channel_delete(argv[2]);
+            LOG("session failed: channel closed.")
+            return EXIT_SUCCESS;
+        }
 
         while (scan_message(message) != -1) {
             serialize_message(buffer, code, message);

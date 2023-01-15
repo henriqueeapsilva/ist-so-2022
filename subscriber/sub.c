@@ -6,12 +6,17 @@
 #include <unistd.h>
 #include <assert.h>
 #include <string.h>
+#include "../utils/thread.h"
 
 #define __USE_POSIX199309 1
 
 static int fd;
 static int readed_message = 0;
 static char* pipe_name;
+
+mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+cond_t cond = PTHREAD_COND_INITIALIZER;
+
 
 void sigint_handler(int sig) {
     DEBUG("Terminating session: closing channel.");
@@ -23,7 +28,6 @@ void sigint_handler(int sig) {
         _exit(EXIT_SUCCESS);
     }
 
-    //channel_close(fd); -> commented : success
     channel_delete(pipe_name);
     LOG("Session terminated.");
     if(write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0) _exit(EXIT_FAILURE);
