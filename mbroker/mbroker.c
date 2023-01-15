@@ -2,16 +2,16 @@
 
 #include "../fs/operations.h"
 #include "../utils/channel.h"
-#include "../utils/protocol.h"
 #include "../utils/logging.h"
+#include "../utils/protocol.h"
 #include "../utils/thread.h"
 #include "boxes.h"
 #include <assert.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 
 /* -- Interface -- */
 
@@ -36,15 +36,15 @@ int main(int argc, char **argv) {
 
     if (init_boxes())
         return EXIT_FAILURE;
-    
+
     channel_create(reg_channel_name, 0640);
 
     while (1) {
         worker();
     }
 
-    //channel_delete(reg_channel_name);
-    //tfs_destroy();
+    // channel_delete(reg_channel_name);
+    // tfs_destroy();
 
     return EXIT_SUCCESS;
 }

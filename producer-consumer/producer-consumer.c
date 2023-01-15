@@ -1,17 +1,18 @@
-#include <stdio.h>
 #include "producer-consumer.h"
-#include <stdlib.h>
 #include "../utils/thread.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 // pcq_create: create a queue, with a given (fixed) capacity
 //
 // Memory: the queue pointer must be previously allocated
 // (either on the stack or the heap)
-int pcq_create(pc_queue_t *queue, size_t capacity){
+int pcq_create(pc_queue_t *queue, size_t capacity) {
 
     // Allocate memory for pcq_buffer
-    queue->pcq_buffer = calloc(capacity, sizeof(void*));
-    if(queue->pcq_buffer == NULL) return -1;
+    queue->pcq_buffer = calloc(capacity, sizeof(void *));
+    if (queue->pcq_buffer == NULL)
+        return -1;
 
     // initializations
     queue->pcq_capacity = capacity;
@@ -33,7 +34,7 @@ int pcq_create(pc_queue_t *queue, size_t capacity){
 // pcq_destroy: releases the internal resources of the queue
 //
 // Memory: does not free the queue pointer itself
-int pcq_destroy(pc_queue_t *queue){
+int pcq_destroy(pc_queue_t *queue) {
 
     // free buffer memory
     free(queue->pcq_buffer);
@@ -53,8 +54,7 @@ int pcq_destroy(pc_queue_t *queue){
 // pcq_enqueue: insert a new element at the front of the queue
 //
 // If the queue is full, sleep until the queue has space
-int pcq_enqueue(pc_queue_t *queue, void *elem)
-{
+int pcq_enqueue(pc_queue_t *queue, void *elem) {
     // Acquire lock for current size
     mutex_lock(&queue->pcq_current_size_lock);
 
@@ -83,12 +83,10 @@ int pcq_enqueue(pc_queue_t *queue, void *elem)
     return 0;
 }
 
-
 // pcq_dequeue: remove an element from the back of the queue
 //
 // If the queue is empty, sleep until the queue has an element
-void *pcq_dequeue(pc_queue_t *queue)
-{
+void *pcq_dequeue(pc_queue_t *queue) {
     // Acquire lock for current size
     mutex_lock(&queue->pcq_current_size_lock);
 
@@ -116,4 +114,3 @@ void *pcq_dequeue(pc_queue_t *queue)
 
     return elem;
 }
-

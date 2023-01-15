@@ -2,12 +2,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
 #include <stdarg.h>
-#include <unistd.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 void channel_create(const char *name, mode_t mode) {
     if (mkfifo(name, mode) == -1) {
@@ -61,10 +61,10 @@ ssize_t channel_write(int fd, void *buffer, size_t len) {
         }
 
         buffer += ret;
-        remaining -= (size_t) ret;
+        remaining -= (size_t)ret;
     }
 
-    return (ssize_t) (len - remaining);
+    return (ssize_t)(len - remaining);
 }
 
 ssize_t channel_read(int fd, void *buffer, size_t len) {
@@ -82,8 +82,8 @@ ssize_t channel_read(int fd, void *buffer, size_t len) {
         }
 
         buffer += ret;
-        remaining -= (size_t) ret;
+        remaining -= (size_t)ret;
     }
 
-    return (ssize_t) (len - remaining);
+    return (ssize_t)(len - remaining);
 }

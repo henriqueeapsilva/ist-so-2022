@@ -1,36 +1,38 @@
 #include "../utils/channel.h"
 #include "../utils/logging.h"
 #include "../utils/protocol.h"
+#include "../utils/thread.h"
+#include <assert.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <unistd.h>
-#include <assert.h>
 #include <string.h>
-#include "../utils/thread.h"
+#include <unistd.h>
 
 #define __USE_POSIX199309 1
 
 static int fd;
 static int readed_message = 0;
-static char* pipe_name;
+static char *pipe_name;
 
 mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 cond_t cond = PTHREAD_COND_INITIALIZER;
 
-
 void sigint_handler(int sig) {
     DEBUG("Terminating session: closing channel.");
-    if(sig != SIGINT) _exit(EXIT_FAILURE);
-    if(signal(SIGINT, sigint_handler) == SIG_ERR){
+    if (sig != SIGINT)
+        _exit(EXIT_FAILURE);
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
         channel_delete(pipe_name);
         LOG("Session terminated.");
-        if(write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0) _exit(EXIT_FAILURE);
+        if (write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0)
+            _exit(EXIT_FAILURE);
         _exit(EXIT_SUCCESS);
     }
 
     channel_delete(pipe_name);
     LOG("Session terminated.");
-    if(write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0) _exit(EXIT_FAILURE);
+    if (write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0)
+        _exit(EXIT_FAILURE);
     _exit(EXIT_SUCCESS);
 }
 

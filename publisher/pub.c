@@ -1,18 +1,18 @@
 #include "../utils/channel.h"
-#include "../utils/protocol.h"
 #include "../utils/logging.h"
+#include "../utils/protocol.h"
 
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 
 int scan_message(char *msg) {
-    char *end = msg+sizeof(msg);
+    char *end = msg + sizeof(msg);
 
-    while (msg < (end-1)) {
-        *msg = (char) getchar();
+    while (msg < (end - 1)) {
+        *msg = (char)getchar();
 
         if (*msg == '\n') {
             break;
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
         sigaction(SIGPIPE, &sigact, NULL);
 
         // verification: channel ready?
-        if(channel_write(fd, buffer, sizeof(buffer)) == -1){
+        if (channel_write(fd, buffer, sizeof(buffer)) == -1) {
             channel_close(fd);
             channel_delete(argv[2]);
             LOG("session failed: channel closed.")
@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
 
         while (scan_message(message) != -1) {
             serialize_message(buffer, code, message);
-            
+
             channel_write(fd, buffer, sizeof(buffer));
         }
 

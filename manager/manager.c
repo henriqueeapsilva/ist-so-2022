@@ -1,13 +1,12 @@
-#include "../utils/channel.h"
-#include "../utils/protocol.h"
 #include "../utils/box.h"
+#include "../utils/channel.h"
+#include "../utils/logging.h"
+#include "../utils/protocol.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "../utils/logging.h"
 
 static void print_usage() {
     fprintf(stderr,
@@ -37,8 +36,8 @@ static uint8_t eval_request(int argc, char **argv) {
 }
 
 static int boxcmp(const void *e1, const void *e2) {
-    Box *box1 = (Box*) e1;
-    Box *box2 = (Box*) e2;
+    Box *box1 = (Box *)e1;
+    Box *box2 = (Box *)e2;
 
     return strcmp(box1->name, box2->name);
 }
@@ -73,52 +72,55 @@ int main(int argc, char **argv) {
         int fd = channel_open(argv[2], O_RDONLY);
         LOG("Reading response...");
         channel_read(fd, buffer, sizeof(buffer));
-        LOG("Response received.");
-        channel_close(fd);
 
         // assumes: response code = request code + 1
         assert(deserialize_code(buffer) == ++code);
 
         if (code == OP_LIST_BOXES_RET) {
+            Box boxes[64];
+            Box *end = boxes;
             uint8_t last;
-            Box box;
 
-            deserialize_message(buffer, code, &last, box.name, &box.size,
-                                 &box.n_pubs, &box.n_subs);
+            deserialize_message(buffer, code, &last, end->name, &end->size,
+                                &end->n_pubs, &end->n_subs);
 
-            if (!*(box.name)) {
+            if (!*(end->name)) {
                 fprintf(stdout, "NO BOXES FOUND\n");
             } else {
-                Box boxes[64];
                 size_t count = 0;
-                boxes[count++] = box;
-
+                
+                end++;
                 while (!last) {
-                    box = boxes[count++];
+                    channel_read(fd, buffer, sizeof(buffer));
                     assert(deserialize_code(buffer) == code);
-                    deserialize_message(buffer, code, &last, box.name, &box.size,
-                                &box.n_pubs, &box.n_subs);
+                    deserialize_message(buffer, code, &last, end->name,
+                                        &end->size, &end->n_pubs, &end->n_subs);
+                    end++;
                 }
 
                 qsort(boxes, count, sizeof(Box), boxcmp);
 
-                for (int i = 0; i < count; i++) {
-                    box = boxes[i];
-                    fprintf(stdout, "%s %zu %zu %zu\n", box.name, box.size, box.n_pubs, box.n_subs);
+                for (Box *box = boxes; (box < end); box++) {
+                    fprintf(stdout, "%s %zu %zu %zu\n", box->name, box->size,
+                            box->n_pubs, box->n_subs);
                 }
             }
         } else {
-            int32_t retcode;
+            int32_t errcode;
             char errmessage[1024];
 
-            deserialize_message(buffer, code, &retcode, errmessage);
+            deserialize_message(buffer, code, &errcode, errmessage);
 
-            if (retcode == -1) {
+            if (errcode == -1) {
                 fprintf(stdout, "ERROR %s\n", errmessage);
             } else {
                 fprintf(stdout, "OK\n");
             }
         }
+
+        LOG("Response received.");
+
+        channel_close(fd);
     }
 
     channel_delete(argv[2]);

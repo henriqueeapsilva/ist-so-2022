@@ -101,7 +101,6 @@ void rwlock_destroy(rwlock_t *);
  * */
 void cond_init(cond_t *cond);
 
-
 /**
  * Wait the given cond_var
  *
