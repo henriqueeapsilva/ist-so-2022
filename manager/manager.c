@@ -36,6 +36,13 @@ static uint8_t eval_request(int argc, char **argv) {
     return 0;
 }
 
+static int boxcmp(const void *e1, const void *e2) {
+    Box *box1 = (Box*) e1;
+    Box *box2 = (Box*) e2;
+
+    return strcmp(box1->name, box2->name);
+}
+
 int main(int argc, char **argv) {
     uint8_t code = eval_request(argc, argv);
 
@@ -84,12 +91,22 @@ int main(int argc, char **argv) {
             if (!*(box.name)) {
                 fprintf(stdout, "NO BOXES FOUND\n");
             } else {
+                Box boxes[64];
+                size_t count = 0;
+                boxes[count++] = box;
+
                 while (!last) {
-                    /* TODO: Store boxes somewhere, sort alphabetically and only
-                     * then print. */
+                    box = boxes[count++];
                     assert(deserialize_code(buffer) == code);
                     deserialize_message(buffer, code, &last, box.name, &box.size,
                                 &box.n_pubs, &box.n_subs);
+                }
+
+                qsort(boxes, count, sizeof(Box), boxcmp);
+
+                for (int i = 0; i < count; i++) {
+                    box = boxes[i];
+                    fprintf(stdout, "%s %zu %zu %zu\n", box.name, box.size, box.n_pubs, box.n_subs);
                 }
             }
         } else {

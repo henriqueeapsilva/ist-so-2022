@@ -1,5 +1,6 @@
 #include "operations.h"
 #include "../utils/betterassert.h"
+#include "../utils/logging.h"
 #include "config.h"
 #include "state.h"
 #include <stdbool.h>
@@ -60,11 +61,13 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         inum = inode_create(T_FILE);
 
         if (inum < 0) {
+            DEBUG("inode_create failed.");
             unlock_inode(ROOT_DIR_INUM);
             return -1;
         }
 
         if (add_dir_entry(root, name + 1, inum)) {
+            DEBUG("Failed adding to directory.");
             inode_delete(inum);
             unlock_inode(ROOT_DIR_INUM);
             return -1;

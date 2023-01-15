@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
             assert(deserialize_code(buffer) == code);
 
             deserialize_message(buffer, code, message);
-            puts(message);
+            fprintf(stdout, "%s\n", message);
 
             readed_message++;
 
