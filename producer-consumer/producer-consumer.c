@@ -25,7 +25,6 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
     mutex_init(&queue->pcq_tail_lock);
     mutex_init(&queue->pcq_pusher_condvar_lock);
     mutex_init(&queue->pcq_popper_condvar_lock);
-
     cond_init(&queue->pcq_pusher_condvar);
     cond_init(&queue->pcq_popper_condvar);
     return 0;
@@ -44,10 +43,9 @@ int pcq_destroy(pc_queue_t *queue) {
     mutex_destroy(&queue->pcq_head_lock);
     mutex_destroy(&queue->pcq_tail_lock);
     mutex_destroy(&queue->pcq_pusher_condvar_lock);
-    cond_destroy(&queue->pcq_pusher_condvar);
     mutex_destroy(&queue->pcq_popper_condvar_lock);
+    cond_destroy(&queue->pcq_pusher_condvar);
     cond_destroy(&queue->pcq_popper_condvar);
-
     return 0;
 }
 

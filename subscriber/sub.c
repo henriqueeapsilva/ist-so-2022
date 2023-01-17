@@ -1,5 +1,5 @@
-#include "../utils/channel.h"
 #include "../utils/logging.h"
+#include "../utils/pipe.h"
 #include "../utils/protocol.h"
 #include "../utils/thread.h"
 #include <assert.h>
@@ -10,39 +10,21 @@
 
 #define __USE_POSIX199309 1
 
-static int fd;
-static int readed_message = 0;
-static char *pipe_name;
+static int n_messages = 0;
+static char *sub_pipe_name;
 
 mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 cond_t cond = PTHREAD_COND_INITIALIZER;
 
 void sigint_handler(int sig) {
-    DEBUG("Terminating session: closing channel.");
-    if (sig != SIGINT)
-        _exit(EXIT_FAILURE);
-    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
-        channel_delete(pipe_name);
-        LOG("Session terminated.");
-        if (write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0)
-            _exit(EXIT_FAILURE);
-        _exit(EXIT_SUCCESS);
-    }
-
-    channel_delete(pipe_name);
-    LOG("Session terminated.");
-    if (write(STDOUT_FILENO, &readed_message, sizeof(readed_message)) < 0)
+    (void)sig;
+    pipe_delete(sub_pipe_name);
+    if (write(STDOUT_FILENO, &n_messages, sizeof(n_messages)) == -1)
         _exit(EXIT_FAILURE);
     _exit(EXIT_SUCCESS);
 }
 
-int main(int argc, char **argv) {
-    if (argc < 4) {
-        fprintf(stderr,
-                "usage: sub <register_pipe_name> <pipe_name> <box_name>\n");
-        return EXIT_SUCCESS;
-    }
-
+void update_sigint() {
     struct sigaction sigact;
 
     sigemptyset(&sigact.sa_mask);
@@ -52,8 +34,17 @@ int main(int argc, char **argv) {
     sigact.sa_handler = &sigint_handler;
 
     sigaction(SIGINT, &sigact, NULL);
+}
 
-    channel_create(argv[2], 0640);
+int main(int argc, char **argv) {
+    if (argc < 4) {
+        fprintf(stderr,
+                "usage: sub <register_pipe_name> <pipe_name> <box_name>\n");
+        return EXIT_SUCCESS;
+    }
+
+    pipe_create(argv[2], 0640);
+    update_sigint();
 
     {
         LOG("Sending registration request...");
@@ -61,26 +52,23 @@ int main(int argc, char **argv) {
 
         serialize_message(buffer, OP_REGISTER_SUB, argv[2], argv[3]);
 
-        fd = channel_open(argv[1], O_WRONLY);
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
-        LOG("Registration request sent.");
+        pipe_owrite(argv[1], buffer, sizeof(buffer));
     }
 
     // stores the pipe name
-    pipe_name = argv[2];
+    sub_pipe_name = argv[2];
 
     {
-        fd = channel_open(argv[2], O_RDONLY);
+        int fd = pipe_open(argv[2], O_RDONLY);
 
         uint8_t code = OP_MSG_SER_TO_SUB;
         char message[1024];
         char buffer[2048];
 
-        if (!channel_read(fd, buffer, sizeof(buffer))) {
+        if (!pipe_read(fd, buffer, sizeof(buffer))) {
             LOG("Subscriber was rejected by the server.");
-            channel_close(fd);
-            channel_delete(argv[2]);
+            pipe_close(fd);
+            pipe_delete(argv[2]);
             return EXIT_SUCCESS;
         }
 
@@ -90,16 +78,16 @@ int main(int argc, char **argv) {
             deserialize_message(buffer, code, message);
             fprintf(stdout, "%s\n", message);
 
-            readed_message++;
+            n_messages++;
 
-            if (!channel_read(fd, buffer, sizeof(buffer))) {
+            if (!pipe_read(fd, buffer, sizeof(buffer))) {
                 break;
             }
         }
 
-        channel_close(fd);
+        pipe_close(fd);
     }
 
-    channel_delete(argv[2]);
+    pipe_delete(argv[2]);
     return EXIT_SUCCESS;
 }

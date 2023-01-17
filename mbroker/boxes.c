@@ -1,6 +1,6 @@
 #include "boxes.h"
 #include "../fs/operations.h"
-#include "../utils/channel.h"
+#include "../utils/pipe.h"
 #include "../utils/logging.h"
 #include "../utils/protocol.h"
 #include "../utils/thread.h"
@@ -65,7 +65,7 @@ static Box *find_box(char *box_name) {
 void create_box(char *channel_name, char *box_name) {
     LOG("Manager: creating box (%s)...", box_name);
 
-    int fd = channel_open(channel_name, O_WRONLY);
+    int fd = pipe_open(channel_name, O_WRONLY);
 
     uint8_t code = OP_CREATE_BOX_RET;
     int32_t errcode = -1;
@@ -75,8 +75,8 @@ void create_box(char *channel_name, char *box_name) {
         LOG("Manager: box already exists");
         serialize_message(buffer, code, &errcode,
                           "Unable to create box: box already exists.");
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
+        pipe_write(fd, buffer, sizeof(buffer));
+        pipe_close(fd);
         return;
     }
 
@@ -86,8 +86,8 @@ void create_box(char *channel_name, char *box_name) {
         LOG("Manager: could not create box.");
         serialize_message(buffer, code, &errcode,
                           "Unable to create box: no space available.");
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
+        pipe_write(fd, buffer, sizeof(buffer));
+        pipe_close(fd);
         return;
     }
 
@@ -100,8 +100,8 @@ void create_box(char *channel_name, char *box_name) {
         LOG("Manager: could not create box.");
         serialize_message(buffer, code, &errcode,
                           "Unable to create box: tfs_open returned an error.");
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
+        pipe_write(fd, buffer, sizeof(buffer));
+        pipe_close(fd);
         return;
     }
 
@@ -114,8 +114,8 @@ void create_box(char *channel_name, char *box_name) {
     errcode = 0;
     serialize_message(buffer, code, &errcode, "");
 
-    channel_write(fd, buffer, sizeof(buffer));
-    channel_close(fd);
+    pipe_write(fd, buffer, sizeof(buffer));
+    pipe_close(fd);
 
     LOG("Manager: box created.");
 }
@@ -123,7 +123,7 @@ void create_box(char *channel_name, char *box_name) {
 void remove_box(char *channel_name, char *box_name) {
     LOG("Manager: removing box (%s)...", box_name);
 
-    int fd = channel_open(channel_name, O_WRONLY);
+    int fd = pipe_open(channel_name, O_WRONLY);
 
     uint8_t code = 6;
     int32_t errcode = -1;
@@ -135,8 +135,8 @@ void remove_box(char *channel_name, char *box_name) {
         LOG("Manager: could not remove box.");
         serialize_message(buffer, code, &errcode,
                           "Unable to remove box: box not found.");
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
+        pipe_write(fd, buffer, sizeof(buffer));
+        pipe_close(fd);
         return;
     }
 
@@ -148,22 +148,22 @@ void remove_box(char *channel_name, char *box_name) {
         serialize_message(
             buffer, code, &errcode,
             "Unable to remove box: tfs_unlink returned an error.");
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
+        pipe_write(fd, buffer, sizeof(buffer));
+        pipe_close(fd);
         return;
     }
 
     *box->name = 0;
     errcode = 0;
     serialize_message(buffer, code, &errcode, "");
-    channel_write(fd, buffer, sizeof(buffer));
-    channel_close(fd);
+    pipe_write(fd, buffer, sizeof(buffer));
+    pipe_close(fd);
 
     LOG("Manager: box removed.")
 }
 
 void list_boxes(char *channel_name) {
-    int fd = channel_open(channel_name, O_WRONLY);
+    int fd = pipe_open(channel_name, O_WRONLY);
     LOG("Manager: listing boxes...");
 
     uint8_t code = 8;
@@ -182,8 +182,8 @@ void list_boxes(char *channel_name) {
         LOG("Manager: no boxes to list.");
         uint64_t dummy = 0;
         serialize_message(buffer, code, &last, "", &dummy, &dummy, &dummy);
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
+        pipe_write(fd, buffer, sizeof(buffer));
+        pipe_close(fd);
         return;
     }
 
@@ -193,7 +193,7 @@ void list_boxes(char *channel_name) {
             DEBUG("Boxes sent: %s", box->name);
             serialize_message(buffer, code, &last, box->name, &box->size,
                               &box->n_pubs, &box->n_subs);
-            channel_write(fd, buffer, sizeof(buffer));
+            pipe_write(fd, buffer, sizeof(buffer));
             box = curr;
         }
     }
@@ -201,30 +201,30 @@ void list_boxes(char *channel_name) {
     last = 1;
     serialize_message(buffer, code, &last, box->name, &box->size, &box->n_pubs,
                       &box->n_subs);
-    channel_write(fd, buffer, sizeof(buffer));
+    pipe_write(fd, buffer, sizeof(buffer));
 
     DEBUG("Boxes sent: %s", box->name);
 
-    channel_close(fd);
+    pipe_close(fd);
     LOG("Manager: boxes listed.");
 }
 
 void register_pub(char *channel_name, char *box_name) {
     DEBUG("Starting session...");
-    int fd = channel_open(channel_name, O_RDONLY);
+    int fd = pipe_open(channel_name, O_RDONLY);
     DEBUG("Session started.");
 
     Box *box = find_box(box_name);
 
     if (!box) {
         DEBUG("Session terminated: box not found.");
-        channel_close(fd);
+        pipe_close(fd);
         return;
     }
 
     if (box->n_pubs) {
         DEBUG("Session terminated: only 1 publisher supported.");
-        channel_close(fd);
+        pipe_close(fd);
         return;
     }
 
@@ -237,7 +237,7 @@ void register_pub(char *channel_name, char *box_name) {
 
     if (fhandle == -1) {
         DEBUG("Session terminated: tfs_open returned an error.");
-        channel_close(fd);
+        pipe_close(fd);
         return;
     }
 
@@ -246,16 +246,16 @@ void register_pub(char *channel_name, char *box_name) {
     char message[1024];
 
     // To catch the verification bite
-    channel_read(fd, buffer, sizeof(buffer));
+    pipe_read(fd, buffer, sizeof(buffer));
 
-    while (channel_read(fd, buffer, sizeof(buffer))) {
+    while (pipe_read(fd, buffer, sizeof(buffer))) {
         deserialize_message(buffer, code, message);
         DEBUG("Characters published: %lu", strlen(message) + 1);
         ssize_t ret = tfs_write(fhandle, message, strlen(message) + 1);
 
         if (ret == -1) {
             DEBUG("Session terminated: tfs_write returned an error.");
-            channel_close(fd);
+            pipe_close(fd);
             return;
         }
 
@@ -265,21 +265,21 @@ void register_pub(char *channel_name, char *box_name) {
     box->n_pubs = 0;
 
     tfs_close(fhandle);
-    channel_close(fd);
+    pipe_close(fd);
 
     DEBUG("Session terminated.");
 }
 
 void register_sub(char *channel_name, char *box_name) {
     DEBUG("Starting session...");
-    int fd = channel_open(channel_name, O_WRONLY);
+    int fd = pipe_open(channel_name, O_WRONLY);
     DEBUG("Session started.");
 
     Box *box = find_box(box_name);
 
     if (!box) {
         DEBUG("Session terminated: box not found.")
-        channel_close(fd);
+        pipe_close(fd);
         return;
     }
 
@@ -290,7 +290,7 @@ void register_sub(char *channel_name, char *box_name) {
 
     if (fhandle == -1) {
         DEBUG("Session terminated: tfs_open returned an error.");
-        channel_close(fd);
+        pipe_close(fd);
         return;
     }
 
@@ -306,7 +306,7 @@ void register_sub(char *channel_name, char *box_name) {
 
         if (towrite == -1) {
             DEBUG("Session terminated: tfs_read returned an error.");
-            channel_close(fd);
+            pipe_close(fd);
             return;
         }
 
@@ -315,7 +315,7 @@ void register_sub(char *channel_name, char *box_name) {
         message = block;
         while (towrite > 0) {
             serialize_message(buffer, code, message);
-            channel_write(fd, buffer, sizeof(buffer));
+            pipe_write(fd, buffer, sizeof(buffer));
 
             size_t len = strlen(message) + 1;
 
@@ -327,7 +327,7 @@ void register_sub(char *channel_name, char *box_name) {
     }
 
     tfs_close(fhandle);
-    channel_close(fd);
+    pipe_close(fd);
 
     DEBUG("Session terminated.")
 }

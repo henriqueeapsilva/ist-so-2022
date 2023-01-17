@@ -1,4 +1,4 @@
-#include "../utils/channel.h"
+#include "../utils/pipe.h"
 #include "../utils/logging.h"
 #include "../utils/protocol.h"
 
@@ -32,13 +32,7 @@ int scan_message(char *msg, size_t len) {
     return 0;
 }
 
-int main(int argc, char **argv) {
-    if (argc < 4) {
-        fprintf(stderr,
-                "usage: pub <register_pipe_name> <pipe_name> <box_name>\n");
-        return EXIT_SUCCESS;
-    }
-
+static void update_sigint(void) {
     struct sigaction sigact;
 
     sigemptyset(&sigact.sa_mask);
@@ -47,7 +41,19 @@ int main(int argc, char **argv) {
     sigact.sa_flags = SA_RESTART;
     sigact.sa_handler = SIG_IGN;
 
-    channel_create(argv[2], 0640);
+    sigaction(SIGPIPE, &sigact, NULL);
+}
+
+int main(int argc, char **argv) {
+    if (argc < 4) {
+        fprintf(stderr,
+                "usage: pub <register_pipe_name> <pipe_name> <box_name>\n");
+        return EXIT_SUCCESS;
+    }
+
+    
+
+    pipe_create(argv[2], 0640);
 
     {
         char buffer[2048];
@@ -55,44 +61,43 @@ int main(int argc, char **argv) {
         serialize_message(buffer, OP_REGISTER_PUB, argv[2], argv[3]);
 
         LOG("Sending registration request...");
-        int fd = channel_open(argv[1], O_WRONLY);
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
+        int fd = pipe_open(argv[1], O_WRONLY);
+        pipe_write(fd, buffer, sizeof(buffer));
+        pipe_close(fd);
         LOG("Registration request sent.");
     }
 
     {
-        int fd = channel_open(argv[2], O_WRONLY);
+        int fd = pipe_open(argv[2], O_WRONLY);
 
         uint8_t code = OP_MSG_PUB_TO_SER;
         char message[1024];
         char buffer[2048];
 
-        LOG("Ready to publish messages.");
-
         // ignores the SIGPIPE
-        sigaction(SIGPIPE, &sigact, NULL);
+        update_sigint();
 
         // verification: channel ready?
-        if (channel_write(fd, buffer, sizeof(buffer)) == -1) {
-            channel_close(fd);
-            channel_delete(argv[2]);
+        if (pipe_write(fd, buffer, sizeof(buffer)) == -1) {
+            pipe_close(fd);
+            pipe_delete(argv[2]);
             LOG("session failed: channel closed.")
             return EXIT_SUCCESS;
         }
+
+        LOG("Ready to publish messages.");
 
         while (scan_message(message, 1024) != -1) {
             DEBUG("Message size: %lu", strlen(message));
 
             serialize_message(buffer, code, message);
 
-            channel_write(fd, buffer, sizeof(buffer));
+            pipe_write(fd, buffer, sizeof(buffer));
         }
 
-        channel_close(fd);
+        pipe_close(fd);
     }
 
-    channel_delete(argv[2]);
-
+    pipe_delete(argv[2]);
     return EXIT_SUCCESS;
 }

@@ -1,8 +1,9 @@
 #include "protocol.h"
-#include "channel.h"
+#include "pipe.h"
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 static size_t _memcpy(void *dest, void *src, size_t n) {
     memcpy(dest, src, n);
@@ -87,6 +88,7 @@ void serialize_message(void *buffer, uint8_t code, ...) {
 }
 
 void deserialize_message(void *buffer, uint8_t code, ...) {
+    assert(deserialize_code(buffer) == code);
     buffer += sizeof(uint8_t);
 
     va_list ap;

@@ -1,7 +1,7 @@
 /* -- Includes -- */
 
 #include "../fs/operations.h"
-#include "../utils/channel.h"
+#include "../utils/pipe.h"
 #include "../utils/logging.h"
 #include "../utils/protocol.h"
 #include "../utils/thread.h"
@@ -37,13 +37,13 @@ int main(int argc, char **argv) {
     if (init_boxes())
         return EXIT_FAILURE;
 
-    channel_create(reg_channel_name, 0640);
+    pipe_create(reg_channel_name, 0640);
 
     while (1) {
         worker();
     }
 
-    // channel_delete(reg_channel_name);
+    // pipe_delete(reg_channel_name);
     // tfs_destroy();
 
     return EXIT_SUCCESS;
@@ -53,9 +53,9 @@ void worker(void) {
     char buffer[2048];
 
     LOG("Waiting for some request.");
-    int fd = channel_open(reg_channel_name, O_RDONLY);
-    channel_read(fd, buffer, sizeof(buffer));
-    channel_close(fd);
+    int fd = pipe_open(reg_channel_name, O_RDONLY);
+    pipe_read(fd, buffer, sizeof(buffer));
+    pipe_close(fd);
 
     uint8_t code = deserialize_code(buffer);
     LOG("Request received. Code: %d", code);

@@ -1,6 +1,6 @@
 #include "../utils/box.h"
-#include "../utils/channel.h"
 #include "../utils/logging.h"
+#include "../utils/pipe.h"
 #include "../utils/protocol.h"
 #include <assert.h>
 #include <fcntl.h>
@@ -17,15 +17,18 @@ static void print_usage() {
 }
 
 static uint8_t eval_request(int argc, char **argv) {
-    if (argc < 4)
+    LOG("Evaluating request...");
+
+    if (argc < 4) {
         return 0;
+    }
 
     if (!strcmp(argv[3], "create")) {
-        return (argc >= 5) * OP_CREATE_BOX;
+        return (argc > 4) * OP_CREATE_BOX;
     }
 
     if (!strcmp(argv[3], "remove")) {
-        return (argc >= 5) * OP_REMOVE_BOX;
+        return (argc > 4) * OP_REMOVE_BOX;
     }
 
     if (!strcmp(argv[3], "list")) {
@@ -50,60 +53,53 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    char buffer[2048];
-
-    channel_create(argv[2], 0640);
+    pipe_create(argv[2], 0640);
 
     {
-        if (code == OP_LIST_BOXES) { /* list boxes request */
+        LOG("Sending registration request (code: %d)...", code);
+
+        char buffer[2048];
+
+        if (code == OP_LIST_BOXES) {
             serialize_message(buffer, code, argv[2]);
-        } else { /* create/remove box request */
+        } else {
             serialize_message(buffer, code, argv[2], argv[4]);
         }
 
-        LOG("Sending registration request (code: %d)...", code);
-        int fd = channel_open(argv[1], O_WRONLY);
-        channel_write(fd, buffer, sizeof(buffer));
-        channel_close(fd);
-        LOG("Registration request sent.");
+        pipe_owrite(argv[1], buffer, sizeof(buffer));
     }
 
     {
-        int fd = channel_open(argv[2], O_RDONLY);
         LOG("Reading response...");
-        channel_read(fd, buffer, sizeof(buffer));
 
-        // assumes: response code = request code + 1
+        char buffer[2048];
+
+        int fd = pipe_open(argv[2], O_RDONLY);
+        pipe_read(fd, buffer, sizeof(buffer));
+
         assert(deserialize_code(buffer) == ++code);
 
         if (code == OP_LIST_BOXES_RET) {
             Box boxes[64];
             Box *end = boxes;
-            uint8_t last;
 
-            deserialize_message(buffer, code, &last, end->name, &end->size,
-                                &end->n_pubs, &end->n_subs);
+            for (uint8_t last = 0; !last; end++) {
+                pipe_read(fd, buffer, sizeof(buffer));
+
+                deserialize_message(buffer, code, &last, end->name,
+                                    &end->size, &end->n_pubs, &end->n_subs);
+            }
 
             if (!*(end->name)) {
                 fprintf(stdout, "NO BOXES FOUND\n");
-            } else {
-                size_t count = 0;
+                return EXIT_SUCCESS;
+            }
 
-                end++;
-                while (!last) {
-                    channel_read(fd, buffer, sizeof(buffer));
-                    assert(deserialize_code(buffer) == code);
-                    deserialize_message(buffer, code, &last, end->name,
-                                        &end->size, &end->n_pubs, &end->n_subs);
-                    end++;
-                }
+            qsort(boxes, (size_t) (++end - boxes), sizeof(Box), boxcmp);
 
-                qsort(boxes, count, sizeof(Box), boxcmp);
-
-                for (Box *box = boxes; (box < end); box++) {
-                    fprintf(stdout, "%s %zu %zu %zu\n", box->name, box->size,
-                            box->n_pubs, box->n_subs);
-                }
+            for (Box *box = boxes; (box < end); box++) {
+                fprintf(stdout, "%s %zu %zu %zu\n", box->name, box->size,
+                        box->n_pubs, box->n_subs);
             }
         } else {
             int32_t errcode;
@@ -118,12 +114,9 @@ int main(int argc, char **argv) {
             }
         }
 
-        LOG("Response received.");
-
-        channel_close(fd);
+        pipe_close(fd);
     }
 
-    channel_delete(argv[2]);
-
+    pipe_delete(argv[2]);
     return EXIT_SUCCESS;
 }
