@@ -13,6 +13,7 @@ Exercício 1:
 
 Exercício 2:
 [enunciado](https://github.com/hSilva10/SO-project/blob/statement/exercise2.md) -
-[código fornecido](https://github.com/hSilva10/SO-project/tree/base-v2)
+[código fornecido](https://github.com/hSilva10/SO-project/tree/base-v2) -
+[código final](https://github.com/hSilva10/SO-project/tree/release-v2)
 
 Enunciado e código base fornecidos por: [tecnico-so](https://github.com/tecnico-so)
